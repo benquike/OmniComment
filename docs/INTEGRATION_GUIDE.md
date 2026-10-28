@@ -241,3 +241,77 @@ const container = document.createElement('div');
 container.className = 'omnicomment-container';
 shadow.appendChild(container);
 ```
+
+---
+
+## 4. Terminal User Interface (TUI) Integration
+
+Because the OmniComment core engine (`AnchorEngine`, `MarkdownStorageAdapter`, and `AgentAPI`) is completely decoupled from browser DOM and VS Code APIs, it runs natively in terminal environments, Neovim/Vim, CLI review tools, and TUI frameworks (e.g., Python Textual, Go Bubbletea, Rust Ratatui, Node Ink/Blessed).
+
+### TUI Rendering Model
+
+In terminal environments:
+- **Anchors & Highlights**: Displayed using 24-bit TrueColor or 16-color ANSI escape sequences (e.g., `\x1b[43;30m` yellow highlight).
+- **Inline Comment Cards**: Rendered with Unicode box-drawing characters (`┌─`, `│`, `└─`, `├─`) directly under the line where the comment was created.
+- **Collapsing / Folding**: Collapsed comments consume 0 terminal rows (or a single-line badge `💬 [1]`), snapping following code rows up immediately.
+
+```
+12 │ function calculateTax(income: number): number {
+13 │   return income * 0.20;
+   │     ┌─ 💬 OPEN  @CodeReviewer (2026-10-28)────────────────────┐
+   │     │  Consider checking for negative income values.          │
+   │     ├─ Replies (1) ───────────────────────────────────────────┤
+   │     │  @Developer: Added validation guard clause in commit 4b2 │
+   │     └─────────────────────────────────────────────────────────┘
+14 │ }
+```
+
+### CLI Terminal View Example
+
+You can render any commented document directly to terminal stdout:
+
+```typescript
+import * as fs from 'fs';
+import { renderMarkdownWithTuiComments } from '@omnicomment/core/cli/tuiRenderer';
+
+const content = fs.readFileSync('spec/OmniComment.md', 'utf-8');
+const terminalOutput = renderMarkdownWithTuiComments(content, {
+  useColor: true,
+  showResolved: false // Only show unresolved threads
+});
+
+console.log(terminalOutput);
+```
+
+### Neovim Lua Integration (via Extmarks & Virtual Lines)
+
+In Neovim, comments are projected as non-destructive virtual lines (`virt_lines`) that don't alter the buffer:
+
+```lua
+-- omnicomment.lua
+local M = {}
+local ns_id = vim.api.nvim_create_namespace("omnicomment")
+
+function M.render_comments(comments)
+  vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
+  for _, c in ipairs(comments) do
+    if not c.resolved then
+      -- Highlight anchor range
+      vim.api.nvim_buf_add_highlight(0, ns_id, "Visual", c.anchor.startLine, c.anchor.startChar, c.anchor.endChar)
+      
+      -- Render inline comment box using virt_lines
+      local virt_lines = {
+        { { "    ┌─ 💬 " .. c.author .. ": " .. c.content, "Comment" } },
+        { { "    └────────────────────────────────────────", "Comment" } }
+      }
+      vim.api.nvim_buf_set_extmark(0, ns_id, c.anchor.endLine, 0, {
+        virt_lines = virt_lines,
+        virt_lines_above = false
+      })
+    end
+  end
+end
+
+return M
+```
+
