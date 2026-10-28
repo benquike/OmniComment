@@ -153,7 +153,13 @@ Comments are stored directly inside the Markdown document in an HTML comment blo
 
 ---
 
-## Architecture Design Document
+## Documentation
 
-For complete details on the modular multi-package monorepo design, W3C Web Annotation compliance, web plugin embedding, Chrome extension architecture, and MCP tools, see the full architectural design artifact:
-- [OmniComment Architecture Design](file:///usr/local/google/home/phui/.gemini/jetski/brain/4b0eeb77-a542-42e9-9b98-944b2d06c997/omnicomment_architecture_design.md)
+Comprehensive guides are available in the [`docs/`](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/README.md) directory:
+
+- 📖 **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
+- 🌐 **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into any website, blogs, documentation frameworks (Docusaurus, VitePress, Hugo), Chrome extensions, and VS Code.
+- ⚙️ **[Configuration & Presets Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
+- 🏗️ **[Architecture & Data Model](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
+
+For complete deep-dive specifications, also see the [OmniComment Architecture Design Artifact](file:///usr/local/google/home/phui/.gemini/jetski/brain/4b0eeb77-a542-42e9-9b98-944b2d06c997/omnicomment_architecture_design.md).
