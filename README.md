@@ -155,11 +155,39 @@ Comments are stored directly inside the Markdown document in an HTML comment blo
 
 ## Documentation
 
-Comprehensive guides are available in the [`docs/`](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/README.md) directory:
+Comprehensive guides and tutorials are available in the [`docs/`](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/README.md) directory:
 
-- 📖 **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
-- 🌐 **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into any website, blogs, documentation frameworks (Docusaurus, VitePress, Hugo), Chrome extensions, and VS Code.
+- 🏠 **[Project Home Page](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/HOME.md)**: Product overview, value propositions, cross-surface feature matrix, and quickstarts.
+- 🎓 **[Hands-on Tutorial](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/TUTORIAL.md)**: Step-by-step guide from zero to hero across VS Code, presets, web embedding, browser extensions, and AI reviewer agents.
+- 📚 **[Comprehensive API Reference](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/API_REFERENCE.md)**: Formal API specification for data structures (`Comment`, `Reply`, `CommentAnchor`), commands, TypeScript core classes, and `<omni-comment>`.
+- 🤖 **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
+- 🌐 **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into websites, blogs, documentation frameworks (Docusaurus, VitePress, Hugo), Chrome extensions, and TUI/Neovim.
 - ⚙️ **[Configuration & Presets Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
 - 🏗️ **[Architecture & Data Model](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
 
-For complete deep-dive specifications, also see the [OmniComment Architecture Design Artifact](file:///usr/local/google/home/phui/.gemini/jetski/brain/4b0eeb77-a542-42e9-9b98-944b2d06c997/omnicomment_architecture_design.md).
+---
+
+## Rendering the Documentation Website
+
+OmniComment includes a built-in static site generator ([`scripts/render-docs.js`](file:///usr/local/google/home/phui/src/tools/editor/Markco/scripts/render-docs.js)) that compiles the Markdown guides into a responsive documentation website featuring sidebar navigation, Prism syntax highlighting, live Mermaid diagrams, GitHub callout alerts, and an active Table of Contents.
+
+### 1. Build the Static Site
+```bash
+npm run docs:build
+# or directly:
+node scripts/render-docs.js
+```
+The compiled HTML site is output to `dist/site/index.html`.
+
+### 2. Launch Local Preview Server
+```bash
+npm run docs:serve
+# or with a custom port:
+node scripts/render-docs.js --serve --port=8080
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser to explore the rendered documentation portal.
+
+### 3. Render a Single Markdown File
+```bash
+node scripts/render-docs.js path/to/file.md
+```

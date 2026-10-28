@@ -61,3 +61,9 @@ await vscode.commands.executeCommand('omnicomment.agent.postComment', {
 ```bash
 npx ts-node src/cli/tuiRenderer.ts docs/ARCHITECTURE.md --unresolved
 ```
+
+### 4. Build & Preview the Documentation Website
+```bash
+npm run docs:build   # Compiles all markdown files into dist/site/
+npm run docs:serve   # Starts local preview web server at http://localhost:3000
+```
