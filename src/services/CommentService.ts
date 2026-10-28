@@ -289,6 +289,262 @@ export class CommentService {
   }
 
   /**
+   * Add a new comment using anchor text (used when commenting from custom editors/viewers
+   * where a vscode.TextEditor selection is not directly available)
+   */
+  async addCommentByAnchorText(
+    document: vscode.TextDocument,
+    anchorText: string,
+    content: string
+  ): Promise<Comment | null> {
+    const trimmedAnchor = anchorText.trim();
+    if (!trimmedAnchor) {
+      return null;
+    }
+
+    const anchor = this.findAnchorTextInDocument(document, trimmedAnchor);
+    if (!anchor) {
+      return null;
+    }
+
+    const author = await this.getGitUserName(document);
+
+    const comment: Comment = {
+      id: uuidv4(),
+      anchor,
+      content,
+      author,
+      createdAt: new Date().toISOString()
+    };
+
+    const comments = this.getComments(document);
+    comments.push(comment);
+
+    const success = await this.saveComments(document, comments);
+    return success ? comment : null;
+  }
+
+  /**
+   * Re-anchor a comment using anchor text (used in custom editors/viewers)
+   */
+  async reAnchorCommentByText(
+    document: vscode.TextDocument,
+    commentId: string,
+    anchorText: string
+  ): Promise<Comment | null> {
+    const trimmedAnchor = anchorText.trim();
+    if (!trimmedAnchor) {
+      return null;
+    }
+
+    const comments = this.getComments(document);
+    const comment = comments.find(c => c.id === commentId);
+    if (!comment) {
+      return null;
+    }
+
+    const newAnchor = this.findAnchorTextInDocument(document, trimmedAnchor);
+    if (!newAnchor) {
+      return null;
+    }
+
+    comment.anchor = newAnchor;
+    comment.orphaned = false;
+    comment.updatedAt = new Date().toISOString();
+
+    const success = await this.saveComments(document, comments);
+    return success ? comment : null;
+  }
+
+  /**
+   * Locate arbitrary anchor text in the document (outside the markco comment block).
+   * Supports exact matches, text copied from WYSIWYG editors like Vditor ("Markdown Editor")
+   * that inject zero-width spaces (\u200B) or non-breaking spaces (\u00A0), and normalized
+   * Markdown matches (including inline bold/italic/code/links and multi-line selections).
+   */
+  public findAnchorTextInDocument(
+    document: vscode.TextDocument,
+    searchText: string
+  ): CommentAnchor | null {
+    const cleanedSearch = searchText
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .trim();
+    if (!cleanedSearch) {
+      return null;
+    }
+
+    // 1. Try exact match first (via findAnchorInDocument)
+    const exactMatch = this.findAnchorInDocument(document, {
+      text: cleanedSearch,
+      startLine: 0,
+      startChar: 0,
+      endLine: 0,
+      endChar: 0
+    });
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    // Extract searchable text (excluding the markco comment block) and offset mapper
+    const fullText = document.getText();
+    const commentBlockStart = findCommentBlockStart(fullText);
+    let searchableText: string;
+    let removedLength = 0;
+
+    if (commentBlockStart !== -1) {
+      const commentBlockEnd = fullText.indexOf(COMMENT_BLOCK_END, commentBlockStart);
+      if (commentBlockEnd !== -1) {
+        removedLength = (commentBlockEnd + COMMENT_BLOCK_END.length) - commentBlockStart;
+        searchableText =
+          fullText.substring(0, commentBlockStart) +
+          fullText.substring(commentBlockEnd + COMMENT_BLOCK_END.length);
+      } else {
+        searchableText = fullText.substring(0, commentBlockStart);
+      }
+    } else {
+      searchableText = fullText;
+    }
+
+    const toOriginalOffset = (searchableOffset: number): number => {
+      if (commentBlockStart !== -1 && removedLength > 0 && searchableOffset >= commentBlockStart) {
+        return searchableOffset + removedLength;
+      }
+      return searchableOffset;
+    };
+
+    // 2. Character-offset-preserving normalized Markdown match (supports inline & multi-line)
+    const normDoc = this.buildNormalizedMarkdownMap(searchableText);
+    const normQuery = this.buildNormalizedMarkdownMap(cleanedSearch).value;
+
+    if (normQuery) {
+      let normIndex = normDoc.value.indexOf(normQuery);
+      if (normIndex === -1) {
+        normIndex = normDoc.value.toLowerCase().indexOf(normQuery.toLowerCase());
+      }
+      if (normIndex !== -1) {
+        const searchableStart = normDoc.offsets[normIndex];
+        const searchableEnd = normDoc.offsets[normIndex + normQuery.length - 1] + 1;
+        const origStart = toOriginalOffset(searchableStart);
+        let origEnd = toOriginalOffset(searchableEnd);
+
+        // If the matched slice opened an inline formatting delimiter (**, __, ~~, *, _, `)
+        // that closes immediately at origEnd, include the closing delimiter so Markdown stays balanced
+        const hasUnbalancedDelimiter = (slice: string, ch: string): boolean => {
+          let count = 0;
+          for (let i = 0; i < slice.length; i++) {
+            if (slice[i] === ch) {
+              count++;
+            }
+          }
+          return count % 2 === 1;
+        };
+
+        while (
+          origEnd < fullText.length &&
+          /[*_~`]/.test(fullText[origEnd]) &&
+          hasUnbalancedDelimiter(fullText.substring(origStart, origEnd), fullText[origEnd])
+        ) {
+          origEnd++;
+        }
+
+        const matchedRaw = fullText.substring(origStart, origEnd);
+        const startPos = document.positionAt(origStart);
+        const endPos = document.positionAt(origEnd);
+        return {
+          text: matchedRaw,
+          startLine: startPos.line,
+          startChar: startPos.character,
+          endLine: endPos.line,
+          endChar: endPos.character
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Builds a normalized plain-text string from Markdown along with an array mapping each
+   * character index in the normalized string back to its source offset in `text`.
+   */
+  private buildNormalizedMarkdownMap(text: string): { value: string; offsets: number[] } {
+    const skip = new Uint8Array(text.length);
+
+    const markSkipRegex = (regex: RegExp) => {
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(text)) !== null) {
+        for (let i = m.index; i < m.index + m[0].length; i++) {
+          skip[i] = 1;
+        }
+      }
+    };
+
+    // Skip zero-width characters
+    markSkipRegex(/[\u200B-\u200D\uFEFF]/g);
+    // Skip line-level Markdown block prefixes (headings, blockquotes, lists, task checkboxes)
+    markSkipRegex(/^[ \t]*#{1,6}[ \t]+/gm);
+    markSkipRegex(/^[ \t]*>[ \t]?/gm);
+    markSkipRegex(/^[ \t]*[-*+][ \t]+(\[[ xX]\][ \t]+)?/gm);
+    markSkipRegex(/^[ \t]*\d+\.[ \t]+/gm);
+
+    // For Markdown links/images `[label](url)` or `![alt](url)`, keep only `label`/`alt`
+    const linkRegex = /!?\[([^\]]*)\]\(([^)]*)\)/g;
+    let linkMatch: RegExpExecArray | null;
+    while ((linkMatch = linkRegex.exec(text)) !== null) {
+      const fullStart = linkMatch.index;
+      const isImage = text[fullStart] === '!';
+      const labelStart = fullStart + (isImage ? 2 : 1);
+      const labelEnd = labelStart + linkMatch[1].length;
+      const fullEnd = fullStart + linkMatch[0].length;
+      for (let i = fullStart; i < labelStart; i++) {
+        skip[i] = 1;
+      }
+      for (let i = labelEnd; i < fullEnd; i++) {
+        skip[i] = 1;
+      }
+    }
+
+    // Skip inline formatting delimiters (**, __, ~~, `) and single * / _
+    markSkipRegex(/(\*\*|__|~~|`)/g);
+    markSkipRegex(/(?<=^|[\s(])[*_](?=\S)|(?<=\S)[*_](?=[\s).,!?:;]|$)/gm);
+
+    const chars: string[] = [];
+    const offsets: number[] = [];
+    let lastWasSpace = true; // Trim leading whitespace
+
+    for (let i = 0; i < text.length; i++) {
+      if (skip[i]) {
+        continue;
+      }
+      const ch = text[i];
+      if (/\s|\u00A0/.test(ch)) {
+        if (!lastWasSpace) {
+          chars.push(' ');
+          offsets.push(i);
+          lastWasSpace = true;
+        }
+      } else {
+        chars.push(ch);
+        offsets.push(i);
+        lastWasSpace = false;
+      }
+    }
+
+    // Trim trailing space
+    if (chars.length > 0 && chars[chars.length - 1] === ' ') {
+      chars.pop();
+      offsets.pop();
+    }
+
+    return {
+      value: chars.join(''),
+      offsets
+    };
+  }
+
+  /**
    * Delete a comment by ID
    */
   async deleteComment(document: vscode.TextDocument, commentId: string): Promise<boolean> {

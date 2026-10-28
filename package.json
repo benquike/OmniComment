@@ -21,7 +21,10 @@
   ],
   "activationEvents": [
     "onLanguage:markdown",
-    "onLanguage:skill"
+    "onLanguage:skill",
+    "onCustomEditor:zaaack.markdown-editor",
+    "onCustomEditor:cweijan.markdownViewer",
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -51,27 +54,42 @@
         "command": "markco.navigateToComment",
         "title": "Navigate to Comment",
         "category": "Markco"
+      },
+      {
+        "command": "markco.editorCommentAction",
+        "title": "In-Editor Comment Action",
+        "category": "Markco"
+      },
+      {
+        "command": "markco.inlineReplyComment",
+        "title": "Respond",
+        "category": "Markco"
+      },
+      {
+        "command": "markco.inlineToggleResolve",
+        "title": "Resolve / Reopen Comment",
+        "category": "Markco",
+        "icon": "$(check)"
+      },
+      {
+        "command": "markco.inlineDeleteThread",
+        "title": "Delete Comment Thread",
+        "category": "Markco",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "markco.inlineDeleteCommentItem",
+        "title": "Delete Comment / Response",
+        "category": "Markco",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "markco.toggleCollapseAllComments",
+        "title": "Collapse / Expand All In-Editor Comments",
+        "category": "Markco",
+        "icon": "$(collapse-all)"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "markco-sidebar",
-          "title": "Markco Comments",
-          "icon": "$(comment-discussion)"
-        }
-      ]
-    },
-    "views": {
-      "markco-sidebar": [
-        {
-          "type": "webview",
-          "id": "markco.commentSidebar",
-          "icon": "media/markco.svg",
-          "name": "Comments"
-        }
-      ]
-    },
     "menus": {
       "editor/context": [
         {
@@ -82,9 +100,40 @@
       ],
       "editor/title": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill",
+          "when": "editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
           "command": "markco.addComment",
           "group": "navigation"
+        },
+        {
+          "when": "editorLangId == markdown || editorLangId == skill",
+          "command": "markco.toggleCollapseAllComments",
+          "group": "navigation"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "markco.inlineReplyComment",
+          "when": "commentController == markco-inline",
+          "group": "inline"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "markco.inlineToggleResolve",
+          "when": "commentController == markco-inline",
+          "group": "navigation@1"
+        },
+        {
+          "command": "markco.inlineDeleteThread",
+          "when": "commentController == markco-inline",
+          "group": "navigation@2"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "markco.inlineDeleteCommentItem",
+          "when": "commentController == markco-inline",
+          "group": "inline"
         }
       ]
     },
@@ -93,7 +142,7 @@
         "command": "markco.addComment",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
-        "when": "editorLangId == markdown || editorLangId == skill"
+        "when": "editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
       }
     ],
     "configuration": {

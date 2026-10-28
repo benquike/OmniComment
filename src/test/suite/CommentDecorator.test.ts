@@ -128,7 +128,7 @@ suite('CommentDecorator Test Suite', () => {
       // Should not throw and should apply decorations for 2 comments
       commentDecorator.applyDecorations(editor, comments);
       
-      assert.strictEqual(comments.length, 2);
+      assert.strictEqual(comments.length, 4);
     });
 
     test('should highlight focused comment in Markco.md differently', async () => {

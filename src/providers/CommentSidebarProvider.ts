@@ -9,22 +9,38 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private _comments: Comment[] = [];
   private _focusedCommentId: string | null = null;
+  private _isReady = false;
+  private _pendingAddCommentForm: {
+    hasSelection: boolean;
+    anchorText?: string;
+    isCustomEditor?: boolean;
+  } | null = null;
+  private _pendingFocusCommentId: string | null = null;
+
+  private _stateResolvers: Array<
+    (state: {
+      isFormOpen: boolean;
+      anchorText: string;
+      commentInput: string;
+      renderedCount: number;
+    }) => void
+  > = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
-    private readonly _onNavigate: (commentId: string) => void,
-    private readonly _onDelete: (commentId: string) => void,
-    private readonly _onEdit: (commentId: string, content: string) => void,
-    private readonly _onReady?: () => void,
-    private readonly _onAddReply?: (commentId: string, content: string) => void,
-    private readonly _onEditReply?: (commentId: string, replyId: string, content: string) => void,
-    private readonly _onDeleteReply?: (commentId: string, replyId: string) => void,
-    private readonly _onResolve?: (commentId: string) => void,
-    private readonly _onAddComment?: () => void,
-    private readonly _onSubmitNewComment?: (content: string) => void,
-    private readonly _onReAnchor?: (commentId: string) => void,
-    private readonly _onThumbsUpComment?: (commentId: string) => void,
-    private readonly _onThumbsUpReply?: (commentId: string, replyId: string) => void
+    private readonly _onNavigate: (commentId: string) => void | Promise<void>,
+    private readonly _onDelete: (commentId: string) => void | Promise<void>,
+    private readonly _onEdit: (commentId: string, content: string) => void | Promise<void>,
+    private readonly _onReady?: () => void | Promise<void>,
+    private readonly _onAddReply?: (commentId: string, content: string) => void | Promise<void>,
+    private readonly _onEditReply?: (commentId: string, replyId: string, content: string) => void | Promise<void>,
+    private readonly _onDeleteReply?: (commentId: string, replyId: string) => void | Promise<void>,
+    private readonly _onResolve?: (commentId: string) => void | Promise<void>,
+    private readonly _onAddComment?: () => void | Promise<void>,
+    private readonly _onSubmitNewComment?: (content: string, anchorText?: string) => void | Promise<void>,
+    private readonly _onReAnchor?: (commentId: string) => void | Promise<void>,
+    private readonly _onThumbsUpComment?: (commentId: string) => void | Promise<void>,
+    private readonly _onThumbsUpReply?: (commentId: string, replyId: string) => void | Promise<void>
   ) {}
 
   public resolveWebviewView(
@@ -33,6 +49,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     _token: vscode.CancellationToken
   ): void {
     this._view = webviewView;
+    this._isReady = false;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -41,8 +58,13 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlContent(webviewView.webview);
 
+    webviewView.onDidDispose(() => {
+      this._view = undefined;
+      this._isReady = false;
+    });
+
     // Handle messages from the webview
-    webviewView.webview.onDidReceiveMessage((message: SidebarMessage) => {
+    webviewView.webview.onDidReceiveMessage(async (message: SidebarMessage) => {
       switch (message.type) {
         case 'navigateToComment':
           this._onNavigate(message.commentId);
@@ -74,36 +96,67 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
           }
           break;
         case 'ready':
+          this._isReady = true;
           // Webview is ready, request current comments from extension
           if (this._onReady) {
-            this._onReady();
+            await this._onReady();
+          }
+          if (this._pendingAddCommentForm && this._view) {
+            const pending = this._pendingAddCommentForm;
+            this._pendingAddCommentForm = null;
+            this._view.webview.postMessage({
+              type: 'showAddCommentForm',
+              hasSelection: pending.hasSelection,
+              anchorText: pending.anchorText,
+              isCustomEditor: pending.isCustomEditor
+            } as SidebarMessage);
+          }
+          if (this._pendingFocusCommentId && this._view) {
+            const pendingFocus = this._pendingFocusCommentId;
+            this._pendingFocusCommentId = null;
+            this._view.webview.postMessage({
+              type: 'focusComment',
+              commentId: pendingFocus
+            } as SidebarMessage);
           }
           break;
         case 'addComment':
           if (this._onAddComment) {
-            this._onAddComment();
+            await this._onAddComment();
           }
           break;
         case 'submitNewComment':
           if (this._onSubmitNewComment) {
-            this._onSubmitNewComment(message.content);
+            await this._onSubmitNewComment(message.content, message.anchorText);
           }
           break;
         case 'reAnchorComment':
           if (this._onReAnchor) {
-            this._onReAnchor(message.commentId);
+            await this._onReAnchor(message.commentId);
           }
           break;
         case 'toggleThumbsUpComment':
           if (this._onThumbsUpComment) {
-            this._onThumbsUpComment(message.commentId);
+            await this._onThumbsUpComment(message.commentId);
           }
           break;
         case 'toggleThumbsUpReply':
           if (this._onThumbsUpReply) {
-            this._onThumbsUpReply(message.commentId, message.replyId);
+            await this._onThumbsUpReply(message.commentId, message.replyId);
           }
           break;
+        case 'webviewState': {
+          const resolvers = this._stateResolvers.splice(0, this._stateResolvers.length);
+          for (const resolve of resolvers) {
+            resolve({
+              isFormOpen: message.isFormOpen,
+              anchorText: message.anchorText,
+              commentInput: message.commentInput,
+              renderedCount: message.renderedCount
+            });
+          }
+          break;
+        }
       }
     });
 
@@ -120,7 +173,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
    */
   public refresh(comments: Comment[], currentUser?: string): void {
     this._comments = comments;
-    if (this._view) {
+    if (this._view && this._isReady) {
       this._view.webview.postMessage({
         type: 'refresh',
         comments: comments,
@@ -134,24 +187,88 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
    */
   public focusComment(commentId: string): void {
     this._focusedCommentId = commentId;
-    if (this._view) {
+    if (this._view && this._isReady) {
       this._view.webview.postMessage({
         type: 'focusComment',
         commentId: commentId
       } as SidebarMessage);
+    } else {
+      this._pendingFocusCommentId = commentId;
     }
   }
 
   /**
    * Show the add comment form in the sidebar
    */
-  public showAddCommentForm(hasSelection: boolean): void {
-    if (this._view) {
+  public showAddCommentForm(hasSelection: boolean, anchorText?: string, isCustomEditor?: boolean): void {
+    if (this._view && this._isReady) {
       this._view.webview.postMessage({
         type: 'showAddCommentForm',
-        hasSelection: hasSelection
+        hasSelection: hasSelection,
+        anchorText: anchorText,
+        isCustomEditor: isCustomEditor
       } as SidebarMessage);
+    } else {
+      this._pendingAddCommentForm = {
+        hasSelection,
+        anchorText,
+        isCustomEditor
+      };
     }
+  }
+
+  /**
+   * Wait until the sidebar webview has initialized and reported 'ready'.
+   */
+  public async waitForReady(timeoutMs = 5000): Promise<boolean> {
+    const start = Date.now();
+    while (!this._isReady || !this._view) {
+      if (Date.now() - start > timeoutMs) {
+        return false;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return true;
+  }
+
+  /**
+   * Query the live DOM state of the sidebar webview (used by E2E tests).
+   */
+  public async getWebviewState(timeoutMs = 3000): Promise<{
+    isFormOpen: boolean;
+    anchorText: string;
+    commentInput: string;
+    renderedCount: number;
+  }> {
+    const ready = await this.waitForReady(timeoutMs);
+    if (!ready || !this._view) {
+      throw new Error('Sidebar webview is not ready');
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Timed out waiting for webviewState'));
+      }, timeoutMs);
+      this._stateResolvers.push(state => {
+        clearTimeout(timer);
+        resolve(state);
+      });
+      this._view!.webview.postMessage({ type: 'getWebviewState' } as SidebarMessage);
+    });
+  }
+
+  /**
+   * Fill and submit the Add Comment form inside the sidebar webview DOM (used by E2E tests).
+   */
+  public async submitFormFromWebview(content: string, anchorText?: string): Promise<void> {
+    const ready = await this.waitForReady();
+    if (!ready || !this._view) {
+      throw new Error('Sidebar webview is not ready');
+    }
+    this._view.webview.postMessage({
+      type: 'fillAndSubmitForm',
+      content,
+      anchorText
+    } as SidebarMessage);
   }
 
   private _getHtmlContent(webview: vscode.Webview): string {
@@ -197,8 +314,12 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
         </button>
       </div>
       <div id="selection-warning" class="form-warning hidden">
-        <i class="codicon codicon-warning"></i>
-        <span>Please select text in the editor first</span>
+        <i class="codicon codicon-info"></i>
+        <span id="selection-warning-text">Please select or enter text from the document</span>
+      </div>
+      <div id="anchor-text-group" class="anchor-input-group">
+        <label for="anchor-text-input" class="form-label">Target text in document</label>
+        <textarea id="anchor-text-input" class="form-text-input" placeholder="Paste or type text from document to comment on..." rows="2"></textarea>
       </div>
       <textarea id="new-comment-input" class="form-input" placeholder="Type your comment..." rows="3"></textarea>
       <div class="form-actions">
@@ -240,36 +361,52 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       renderComments();
     }
 
-    function showAddCommentForm(hasSelection) {
+    function showAddCommentForm(hasSelection, anchorText, isCustomEditor) {
       const form = document.getElementById('add-comment-form');
       const warning = document.getElementById('selection-warning');
+      const warningText = document.getElementById('selection-warning-text');
+      const anchorInput = document.getElementById('anchor-text-input');
       const input = document.getElementById('new-comment-input');
       
       form.classList.remove('hidden');
+      anchorInput.value = anchorText || '';
+      input.disabled = false;
+      anchorInput.disabled = false;
       
-      if (!hasSelection) {
+      if (isCustomEditor && !anchorText) {
+        warningText.textContent = 'Copy text in the viewer or type the target text below';
         warning.classList.remove('hidden');
-        input.disabled = true;
+        anchorInput.focus();
+      } else if (!hasSelection && !isCustomEditor && !anchorText) {
+        warningText.textContent = 'Select text in the editor or enter target text below';
+        warning.classList.remove('hidden');
+        anchorInput.focus();
       } else {
         warning.classList.add('hidden');
-        input.disabled = false;
         input.focus();
       }
     }
 
     function hideAddCommentForm() {
       const form = document.getElementById('add-comment-form');
+      const anchorInput = document.getElementById('anchor-text-input');
       const input = document.getElementById('new-comment-input');
       form.classList.add('hidden');
+      if (anchorInput) {
+        anchorInput.value = '';
+        anchorInput.disabled = false;
+      }
       input.value = '';
       input.disabled = false;
     }
 
     function submitNewComment() {
+      const anchorInput = document.getElementById('anchor-text-input');
       const input = document.getElementById('new-comment-input');
       const content = input.value.trim();
+      const anchorText = anchorInput ? anchorInput.value.trim() : '';
       if (content) {
-        vscode.postMessage({ type: 'submitNewComment', content: content });
+        vscode.postMessage({ type: 'submitNewComment', content: content, anchorText: anchorText });
         hideAddCommentForm();
       }
     }
@@ -306,10 +443,15 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
               </button>
             </div>
           \` : ''}
+          <div class="comment-anchor-box" title="Anchored at \${formatLineRange(comment.anchor)} — click to locate in document">
+            <div class="comment-anchor-meta">
+              <span class="comment-line-badge"><i class="codicon codicon-location"></i> \${formatLineRange(comment.anchor)}</span>
+            </div>
+            <div class="comment-anchor">\${escapeHtml(comment.anchor.text)}</div>
+          </div>
           \${editingCommentId === comment.id ? renderEditCommentForm(comment) : \`
             <div class="comment-content">\${escapeHtml(comment.content)}</div>
           \`}
-          <div class="comment-anchor">On: "\${escapeHtml(truncate(comment.anchor.text, 40))}"</div>
           \${editingCommentId !== comment.id ? \`
             <div class="comment-actions">
               <div class="actions-left">
@@ -512,6 +654,15 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       return text.substring(0, length) + '...';
     }
 
+    function formatLineRange(anchor) {
+      if (!anchor || typeof anchor.startLine !== 'number') {
+        return 'Document';
+      }
+      const start = anchor.startLine + 1;
+      const end = typeof anchor.endLine === 'number' ? anchor.endLine + 1 : start;
+      return start === end ? 'Line ' + start : 'Lines ' + start + '–' + end;
+    }
+
     function formatDate(isoString) {
       const date = new Date(isoString);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -565,8 +716,33 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
           focusComment(message.commentId);
           break;
         case 'showAddCommentForm':
-          showAddCommentForm(message.hasSelection);
+          showAddCommentForm(message.hasSelection, message.anchorText, message.isCustomEditor);
           break;
+        case 'getWebviewState': {
+          const form = document.getElementById('add-comment-form');
+          const anchorInput = document.getElementById('anchor-text-input');
+          const commentInput = document.getElementById('new-comment-input');
+          vscode.postMessage({
+            type: 'webviewState',
+            isFormOpen: form ? !form.classList.contains('hidden') : false,
+            anchorText: anchorInput ? anchorInput.value : '',
+            commentInput: commentInput ? commentInput.value : '',
+            renderedCount: document.querySelectorAll('.comment-item').length
+          });
+          break;
+        }
+        case 'fillAndSubmitForm': {
+          const anchorInput = document.getElementById('anchor-text-input');
+          const commentInput = document.getElementById('new-comment-input');
+          if (typeof message.anchorText === 'string' && anchorInput) {
+            anchorInput.value = message.anchorText;
+          }
+          if (commentInput) {
+            commentInput.value = message.content || '';
+          }
+          submitNewComment();
+          break;
+        }
       }
     });
 

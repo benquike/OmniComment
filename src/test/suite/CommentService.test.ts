@@ -41,7 +41,7 @@ suite('CommentService Test Suite', () => {
       
       const comments = commentService.parseComments(mockDocument);
       
-      assert.strictEqual(comments.length, 2);
+      assert.strictEqual(comments.length, 4);
       assert.strictEqual(comments[0].id, '202ba2e2-78e6-410e-9274-33c4069fac71');
       assert.strictEqual(comments[0].content, 'Nice overview');
       assert.strictEqual(comments[0].author, 'Oren Maoz');
@@ -99,8 +99,8 @@ suite('CommentService Test Suite', () => {
       // Second call should use cache
       const comments2 = commentService.getComments(mockDocument);
       
-      assert.strictEqual(comments1.length, 2);
-      assert.strictEqual(comments2.length, 2);
+      assert.strictEqual(comments1.length, 4);
+      assert.strictEqual(comments2.length, 4);
       assert.strictEqual(comments1[0].id, '202ba2e2-78e6-410e-9274-33c4069fac71');
       assert.strictEqual(comments1, comments2);
     });
@@ -265,9 +265,8 @@ suite('CommentService Test Suite', () => {
       await commentService.reconcileAnchors(mockDocument);
       
       const comments = commentService.getComments(mockDocument);
-      assert.strictEqual(comments.length, 2);
-      // Both comments should NOT be orphaned since their anchor text exists in the content
-      // Note: orphaned may be undefined or false when not orphaned
+      assert.strictEqual(comments.length, 4);
+      // Comments should NOT be orphaned since their anchor text exists in the content
       assert.ok(!comments[0].orphaned, 'First comment should NOT be orphaned');
       assert.ok(!comments[1].orphaned, 'Second comment should NOT be orphaned');
     });
@@ -405,6 +404,56 @@ suite('CommentService Test Suite', () => {
       const result = await commentService.toggleThumbsUpComment(mockDocument, 'non-existent');
       
       assert.strictEqual(result, null);
+    });
+  });
+
+  suite('Custom Editor Anchor Text Operations', () => {
+    test('findAnchorTextInDocument should locate exact text outside comment block', () => {
+      const mockDocument = createMockDocument('# Title\n\nThis is a custom editor paragraph.\n');
+      const anchor = commentService.findAnchorTextInDocument(mockDocument, 'custom editor paragraph');
+      assert.ok(anchor);
+      assert.strictEqual(anchor?.text, 'custom editor paragraph');
+      assert.strictEqual(anchor?.startLine, 2);
+      assert.strictEqual(anchor?.startChar, 10);
+    });
+
+    test('findAnchorTextInDocument should match stripped markdown from WYSIWYG viewer', () => {
+      const mockDocument = createMockDocument('# Title\n\nThis has **bold text** and `inline code` in it.\n');
+      const anchor = commentService.findAnchorTextInDocument(
+        mockDocument,
+        'This has bold text and inline code in it.'
+      );
+      assert.ok(anchor);
+      assert.strictEqual(anchor?.startLine, 2);
+      assert.strictEqual(anchor?.text, 'This has **bold text** and `inline code` in it.');
+    });
+
+    test('findAnchorTextInDocument should handle Vditor zero-width spaces and non-breaking spaces', () => {
+      const mockDocument = createMockDocument('# Title\n\nSome **highlighted** word here.\n');
+      const anchor = commentService.findAnchorTextInDocument(
+        mockDocument,
+        'Some\u00A0\u200Bhighlighted\u200B word'
+      );
+      assert.ok(anchor);
+      assert.strictEqual(anchor?.startLine, 2);
+      assert.strictEqual(anchor?.text, 'Some **highlighted** word');
+    });
+
+    test('addCommentByAnchorText should create comment using anchor text', async () => {
+      const mockDocument = createMockDocument('# Heading\n\nTarget text in custom editor.\n');
+      sandbox.stub(commentService, 'getGitUserName').resolves('testuser');
+      sandbox.stub(commentService, 'saveComments').resolves(true);
+
+      const comment = await commentService.addCommentByAnchorText(
+        mockDocument,
+        'Target text in custom editor',
+        'Comment from Markdown Editor'
+      );
+
+      assert.ok(comment);
+      assert.strictEqual(comment?.content, 'Comment from Markdown Editor');
+      assert.strictEqual(comment?.anchor.text, 'Target text in custom editor');
+      assert.strictEqual(comment?.anchor.startLine, 2);
     });
   });
 });

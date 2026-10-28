@@ -164,19 +164,54 @@ kbd {
 
 .comment-content {
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.comment-anchor-box {
+  background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
+  border-left: 3px solid var(--vscode-textBlockQuote-border, rgba(255, 212, 0, 0.85));
+  border-radius: 3px;
+  padding: 6px 8px;
   margin-bottom: 8px;
-  word-wrap: break-word;
+}
+
+.comment-anchor-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.comment-line-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--vscode-badge-foreground, var(--foreground));
+  background: var(--vscode-badge-background, rgba(127, 127, 127, 0.25));
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.comment-line-badge .codicon {
+  font-size: 10px;
 }
 
 .comment-anchor {
   font-size: 11px;
+  line-height: 1.4;
   color: var(--vscode-descriptionForeground);
-  margin-bottom: 8px;
   font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .comment-actions {
@@ -328,9 +363,11 @@ kbd {
 
 .reply-content {
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.45;
   margin-bottom: 6px;
-  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .reply-actions {
@@ -396,6 +433,36 @@ kbd {
 
 .form-warning.hidden {
   display: none;
+}
+
+.anchor-input-group {
+  margin-bottom: 8px;
+}
+
+.form-label {
+  display: block;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+}
+
+.form-text-input {
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--input-bg);
+  color: var(--input-fg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  resize: vertical;
+  min-height: 38px;
+  white-space: pre-wrap;
+}
+
+.form-text-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
 }
 
 .form-input,

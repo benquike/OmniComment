@@ -3,7 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import * as Mocha from 'mocha';
-import { isMarkdownCompatibleLanguage } from '../../extension';
+import {
+  isMarkdownCompatibleLanguage,
+  isMarkdownCompatibleUri,
+  getUriFromTabInput
+} from '../../extension';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
@@ -99,12 +103,26 @@ suite('Extension Test Suite', () => {
       );
       assert.strictEqual(
         editorTitleWhen,
-        'editorLangId == markdown || editorLangId == skill'
+        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
       assert.strictEqual(
         keybindingWhen,
-        'editorLangId == markdown || editorLangId == skill'
+        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
+    });
+
+    test('Should recognize markdown-compatible URIs and custom editor tab inputs', () => {
+      const mdUri = vscode.Uri.file('/workspace/docs/README.md');
+      const skillUri = vscode.Uri.file('/workspace/skills/SKILL.skill');
+      const tsUri = vscode.Uri.file('/workspace/src/index.ts');
+
+      assert.strictEqual(isMarkdownCompatibleUri(mdUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(skillUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
+
+      // Simulate TabInputCustom (e.g., "Markdown Editor")
+      const customTabInput = { uri: mdUri, viewType: 'zaaack.markdown-editor' };
+      assert.strictEqual(getUriFromTabInput(customTabInput)?.toString(), mdUri.toString());
     });
   });
 

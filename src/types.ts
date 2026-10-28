@@ -86,7 +86,16 @@ export type SidebarMessage =
   | { type: 'commentUpdated'; comment: Comment }
   | { type: 'ready' }
   | { type: 'addComment' }
-  | { type: 'showAddCommentForm'; hasSelection: boolean }
-  | { type: 'submitNewComment'; content: string }
+  | { type: 'showAddCommentForm'; hasSelection: boolean; anchorText?: string; isCustomEditor?: boolean }
+  | { type: 'submitNewComment'; content: string; anchorText?: string }
   | { type: 'toggleThumbsUpComment'; commentId: string }
-  | { type: 'toggleThumbsUpReply'; commentId: string; replyId: string };
+  | { type: 'toggleThumbsUpReply'; commentId: string; replyId: string }
+  | { type: 'getWebviewState' }
+  | {
+      type: 'webviewState';
+      isFormOpen: boolean;
+      anchorText: string;
+      commentInput: string;
+      renderedCount: number;
+    }
+  | { type: 'fillAndSubmitForm'; content: string; anchorText?: string };
