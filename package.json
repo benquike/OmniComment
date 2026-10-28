@@ -1,7 +1,7 @@
 {
   "name": "markco",
-  "displayName": "Markco - Markdown Comments",
-  "description": "Interactive commenting system for Markdown files with inline highlights and sidebar navigation",
+  "displayName": "OmniComment - Universal Comments & Annotations",
+  "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
   "version": "0.1.15",
   "publisher": "OrenMaoz",
   "repository": {
@@ -32,62 +32,93 @@
       {
         "command": "markco.addComment",
         "title": "Add Comment",
-        "category": "Markco",
+        "category": "OmniComment",
         "icon": "$(comment)"
       },
       {
         "command": "markco.deleteComment",
         "title": "Delete Comment",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.editComment",
         "title": "Edit Comment",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.toggleSidebar",
         "title": "Toggle Comment Sidebar",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.navigateToComment",
         "title": "Navigate to Comment",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.editorCommentAction",
         "title": "In-Editor Comment Action",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.inlineReplyComment",
         "title": "Respond",
-        "category": "Markco"
+        "category": "OmniComment"
       },
       {
         "command": "markco.inlineToggleResolve",
         "title": "Resolve / Reopen Comment",
-        "category": "Markco",
+        "category": "OmniComment",
         "icon": "$(check)"
       },
       {
         "command": "markco.inlineDeleteThread",
         "title": "Delete Comment Thread",
-        "category": "Markco",
+        "category": "OmniComment",
         "icon": "$(trash)"
       },
       {
         "command": "markco.inlineDeleteCommentItem",
         "title": "Delete Comment / Response",
-        "category": "Markco",
+        "category": "OmniComment",
         "icon": "$(trash)"
       },
       {
         "command": "markco.toggleCollapseAllComments",
         "title": "Collapse / Expand All In-Editor Comments",
-        "category": "Markco",
+        "category": "OmniComment",
         "icon": "$(collapse-all)"
+      },
+      {
+        "command": "omnicomment.applyPreset",
+        "title": "Apply Preset Configuration...",
+        "category": "OmniComment",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "omnicomment.agent.getComments",
+        "title": "Agent: Get Comments",
+        "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.agent.postComment",
+        "title": "Agent: Post Comment",
+        "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.agent.replyComment",
+        "title": "Agent: Reply Comment",
+        "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.agent.resolveComment",
+        "title": "Agent: Resolve Comment",
+        "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.agent.deleteComment",
+        "title": "Agent: Delete Comment",
+        "category": "OmniComment"
       }
     ],
     "menus": {
@@ -146,8 +177,21 @@
       }
     ],
     "configuration": {
-      "title": "Markco",
+      "title": "OmniComment",
       "properties": {
+        "omnicomment.preset": {
+          "type": "string",
+          "enum": [
+            "default",
+            "documentation-site",
+            "git-file-review",
+            "browser-annotator",
+            "team-collaboration",
+            "ai-agent-reviewer"
+          ],
+          "default": "default",
+          "description": "Pre-configured profile tailoring UI density, storage mode, and agent review capabilities"
+        },
         "markco.highlightColor": {
           "type": "string",
           "default": "rgba(255, 212, 0, 0.3)",

@@ -335,4 +335,59 @@ suite('Extension Test Suite', () => {
       assert.strictEqual(expectedChar, 6);
     });
   });
+
+  suite('OmniComment Branding & Agent API Contributions', () => {
+    test('Package should contribute OmniComment branding, presets, and agent commands', () => {
+      const extension = vscode.extensions.getExtension('OrenMaoz.markco');
+      const extensionPath = extension?.extensionPath ?? path.resolve(__dirname, '../../..');
+      const packageJsonPath = path.join(extensionPath, 'package.json');
+      assert.ok(fs.existsSync(packageJsonPath), `package.json not found at ${packageJsonPath}`);
+      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+
+      // Check branding
+      assert.ok(
+        packageJson.displayName.includes('OmniComment'),
+        `Expected displayName to include OmniComment, got ${packageJson.displayName}`
+      );
+
+      // Check preset configuration
+      const configProps = packageJson.contributes.configuration.properties;
+      assert.ok(configProps['omnicomment.preset'], 'omnicomment.preset configuration missing');
+      assert.strictEqual(configProps['omnicomment.preset'].default, 'default');
+      assert.ok(
+        configProps['omnicomment.preset'].enum.includes('documentation-site'),
+        'documentation-site preset missing'
+      );
+      assert.ok(
+        configProps['omnicomment.preset'].enum.includes('git-file-review'),
+        'git-file-review preset missing'
+      );
+      assert.ok(
+        configProps['omnicomment.preset'].enum.includes('browser-annotator'),
+        'browser-annotator preset missing'
+      );
+      assert.ok(
+        configProps['omnicomment.preset'].enum.includes('team-collaboration'),
+        'team-collaboration preset missing'
+      );
+      assert.ok(
+        configProps['omnicomment.preset'].enum.includes('ai-agent-reviewer'),
+        'ai-agent-reviewer preset missing'
+      );
+
+      // Check contributed Agent API commands
+      const commands: Array<{ command: string; category: string }> = packageJson.contributes.commands;
+      const commandNames = commands.map(c => c.command);
+      assert.ok(commandNames.includes('omnicomment.applyPreset'), 'omnicomment.applyPreset command missing');
+      assert.ok(commandNames.includes('omnicomment.agent.getComments'), 'agent.getComments command missing');
+      assert.ok(commandNames.includes('omnicomment.agent.postComment'), 'agent.postComment command missing');
+      assert.ok(commandNames.includes('omnicomment.agent.replyComment'), 'agent.replyComment command missing');
+      assert.ok(commandNames.includes('omnicomment.agent.resolveComment'), 'agent.resolveComment command missing');
+      assert.ok(commandNames.includes('omnicomment.agent.deleteComment'), 'agent.deleteComment command missing');
+
+      // Check category
+      const agentCmd = commands.find(c => c.command === 'omnicomment.agent.getComments');
+      assert.strictEqual(agentCmd?.category, 'OmniComment');
+    });
+  });
 });

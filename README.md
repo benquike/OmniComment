@@ -1,10 +1,26 @@
-# Markco - Markdown Comments
+# OmniComment - Universal Comments & Annotations
 
-Interactive commenting system for Markdown files in VS Code, including `SKILL.md` files opened in VS Code's native `skill` language mode.
+Universal commenting, inline highlight, and thread annotation system for editors (VS Code), embeddable web pages, browser extensions, and autonomous AI agents.
+
+## Key Highlights
+
+- **Universal Multi-Surface Support**:
+  - **VS Code Editors**: Standard text editors, split diffs, and custom WYSIWYG editors (like Vditor / "Markdown Editor").
+  - **Web Embeddable**: Zero-dependency web component (`<omni-comment>`) embeddable into any documentation site, blog, or CMS.
+  - **Browser Extension**: Chrome Manifest V3 extension for annotating arbitrary web pages.
+- **First-Class AI Agent APIs**:
+  - Programmatic VS Code commands and headless APIs for posting, reading, replying, and resolving comment threads.
+  - Perfect for agent review loops, automated code audits, and human-agent collaboration.
+- **Ready-to-Use Preset Configurations**:
+  - One-click configuration switching between `documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, and `ai-agent-reviewer`.
+- **Portable & Version-Controlled Storage**:
+  - Stored directly in the document (supporting both `<!-- omnicomment` and `<!-- markco-comments` blocks) or connected to local/cloud storage backends.
+
+---
 
 ## Screenshots
 
-### Comment Sidebar
+### In-Editor Comment Threads
 
 ![Comment Sidebar](media/screenshot1.png)
 
@@ -12,85 +28,132 @@ Interactive commenting system for Markdown files in VS Code, including `SKILL.md
 
 ![Preview Highlighting](media/preview-screenshot.png)
 
+---
+
 ## Features
 
-- **Inline Comments** - Add comments to any selected text in Markdown files
-- **Smart Selection** - Auto-selects word at cursor or entire line if no text selected
-- **Comment Sidebar** - Dedicated panel showing all comments with navigation
-- **Inline Editing** - Edit comments and replies directly in the sidebar without pop-up dialogs
-- **Two-Way Navigation** - Click comments to jump to text, or navigate from text to comments
-- **Highlight Decorations** - Visual highlighting of commented text in the editor
-- **Preview Highlighting** - Commented text is also highlighted in Markdown preview with tooltips showing comment content
-- **Comment Management** - Edit, delete, resolve, and organize comments easily
-- **Threaded Replies** - Reply to existing comments to create discussion threads
-- **Resolve Comments** - Mark comments as resolved without deleting them
-- **Thumbs Up Reactions** - Show appreciation for comments and replies with thumbs up
-- **Orphan Recovery** - Re-anchor comments when their original text is deleted
-- **Git Integration** - Author names automatically populated from Git config
+- **Inline Annotation Zones**: Comments attach directly under the annotated block or line, collapsing cleanly to 0 height when folded.
+- **Smart Text Selection**: Automatically selects the word at the cursor or the entire line if no text is highlighted.
+- **Comment Sidebar**: Dedicated collapsible panel showing all comments with instant jump-to-location.
+- **Threaded Replies & Discussions**: Nested reply chains with timestamps and Git author attribution.
+- **Resolution Workflow**: Mark comments as resolved with one click; toggle display between active and resolved threads.
+- **Reactions & Thumbs Up**: React to comments and replies with author tracking.
+- **Fuzzy Anchor Recovery**: Robust re-anchoring when the underlying document text changes or moves.
 
-## Usage
+---
 
-1. Open a Markdown file (or a `SKILL.md` file in `skill` mode)
-2. Select text to comment on, or just place your cursor (the extension will auto-select the word at cursor, or the entire line if cursor is at line start/end)
-3. Press `Ctrl+Shift+M` (or `Cmd+Shift+M` on Mac) or click the **+** button in the sidebar
-4. Type your comment in the sidebar form and click "Add Comment"
-5. Use the sidebar to view and navigate between comments
-6. Click the reply icon on any comment to add a reply
-7. Click the edit icon to modify a comment or reply inline (only your own comments/replies)
-8. Click the checkmark icon to resolve a comment (resolved comments remain visible but dimmed)
-9. Use the eye icon toggle in the sidebar header to show/hide resolved comments
-10. If anchor text is deleted, use the pin icon on orphaned comments to re-anchor to new selected text
-11. Click the thumbs up icon on any comment or reply to react (click again to remove)
+## Built-in Configuration Presets
+
+OmniComment provides 5 purpose-built presets to minimize configuration effort:
+
+| Preset | Target Use Case | UI Density & Features |
+| :--- | :--- | :--- |
+| `default` | Standard VS Code editing | Balanced inline chips and sidebar panel |
+| `documentation-site` | Public docs, Docusaurus, VitePress | Floating bubbles, lightweight chips, non-distracting reading |
+| `git-file-review` | Code reviews and git diffs | Line-level anchoring, side-by-side threads, strict diff tracking |
+| `browser-annotator` | Chrome extension / Web research | High-contrast highlights, floating thread overlay, browser sync |
+| `team-collaboration` | Engineering teams | Full avatar badges, reaction counters, multi-user resolution |
+| `ai-agent-reviewer` | AI agent workflows | Agent badges, automated check hooks, structured JSON output |
+
+To switch presets:
+1. Run `OmniComment: Apply Preset Configuration...` (`omnicomment.applyPreset`) from the Command Palette.
+2. Or set `"omnicomment.preset": "ai-agent-reviewer"` in your VS Code `settings.json`.
+
+---
+
+## Programmatic Agent APIs
+
+OmniComment exposes first-class VS Code commands for autonomous AI agents and automated scripting:
+
+### 1. Retrieve Comments (`omnicomment.agent.getComments`)
+```typescript
+const comments = await vscode.commands.executeCommand('omnicomment.agent.getComments', {
+  uri?: string | vscode.Uri,      // Optional document URI (defaults to active editor)
+  includeResolved?: boolean       // Whether to include resolved threads (default: true)
+});
+```
+
+### 2. Post a New Comment (`omnicomment.agent.postComment`)
+```typescript
+const comment = await vscode.commands.executeCommand('omnicomment.agent.postComment', {
+  uri?: string | vscode.Uri,
+  anchorText: 'function calculateTax()',
+  content: 'Consider checking for zero taxable income before computing rate.',
+  author?: 'CodeReviewAgent'
+});
+```
+
+### 3. Reply to a Thread (`omnicomment.agent.replyComment`)
+```typescript
+const reply = await vscode.commands.executeCommand('omnicomment.agent.replyComment', {
+  uri?: string | vscode.Uri,
+  commentId: 'comment-uuid-here',
+  content: 'Fixed in commit 4b2f1a.',
+  author?: 'Developer'
+});
+```
+
+### 4. Resolve or Reopen a Thread (`omnicomment.agent.resolveComment`)
+```typescript
+const updated = await vscode.commands.executeCommand('omnicomment.agent.resolveComment', {
+  uri?: string | vscode.Uri,
+  commentId: 'comment-uuid-here',
+  resolved: true                  // true = resolved, false = open, omitted = toggle
+});
+```
+
+### 5. Delete a Comment (`omnicomment.agent.deleteComment`)
+```typescript
+const result = await vscode.commands.executeCommand('omnicomment.agent.deleteComment', {
+  uri?: string | vscode.Uri,
+  commentId: 'comment-uuid-here'
+});
+```
+
+---
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 | -------- | ------ |
-| `Ctrl+Shift+M` / `Cmd+Shift+M` | Add comment (works with or without selection - auto-selects word or line) |
-| `Ctrl+Enter` / `Cmd+Enter` | Submit comment/reply (when editing in sidebar) |
-| `Escape` | Cancel editing (when in sidebar form) |
+| `Ctrl+Shift+M` / `Cmd+Shift+M` | Add comment to selection or word at cursor |
+| `Ctrl+Enter` / `Cmd+Enter` | Submit comment or reply in sidebar / inline widget |
+| `Escape` | Cancel editing or dismiss active comment form |
 
-## Comment Storage
+---
 
-Comments are stored directly in the Markdown file as a JSON block in an HTML comment at the end of the file:
+## Storage Specification
+
+Comments are stored directly inside the Markdown document in an HTML comment block at the end of the file. OmniComment parses both modern `<!-- omnicomment` and legacy `<!-- markco-comments` blocks seamlessly:
 
 ```markdown
-<!-- markco-comments
+<!-- omnicomment
 {
   "version": 2,
   "comments": [
     {
       "id": "5c903516-cf11-444e-9581-567a37228917",
       "anchor": {
-        "text": "Interactive commenting system for Markdown files in VS Code.",
+        "text": "Universal commenting, inline highlight, and thread annotation system",
         "startLine": 2,
         "startChar": 0,
         "endLine": 2,
-        "endChar": 60
+        "endChar": 70
       },
-      "content": "Nice Header",
-      "author": "user",
-      "createdAt": "2026-01-15T11:47:50.061Z",
+      "content": "Add integration test for browser extension web components.",
+      "author": "agent-reviewer",
+      "createdAt": "2026-10-28T12:00:00.000Z",
       "resolved": false,
-      "replies": [
-        {
-          "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-          "content": "I agree, looks great!",
-          "author": "reviewer",
-          "createdAt": "2026-01-15T12:00:00.000Z"
-        }
-      ]
+      "replies": []
     }
   ]
 }
 -->
 ```
 
-This keeps comments portable and version-control friendly.
+---
 
-<!-- markco-comments
-{
-  "version": 2,
-  "comments": []
-}
--->
+## Architecture Design Document
+
+For complete details on the modular multi-package monorepo design, W3C Web Annotation compliance, web plugin embedding, Chrome extension architecture, and MCP tools, see the full architectural design artifact:
+- [OmniComment Architecture Design](file:///usr/local/google/home/phui/.gemini/jetski/brain/4b0eeb77-a542-42e9-9b98-944b2d06c997/omnicomment_architecture_design.md)

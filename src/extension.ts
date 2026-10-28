@@ -829,6 +829,205 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Helper for agent API commands to locate target document
+  const resolveDocumentContext = async (
+    target?: string | vscode.Uri
+  ): Promise<{ document: vscode.TextDocument; editor?: vscode.TextEditor } | undefined> => {
+    if (target) {
+      const uri =
+        typeof target === 'string'
+          ? target.startsWith('file://')
+            ? vscode.Uri.parse(target)
+            : vscode.Uri.file(target)
+          : target;
+      try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        const editor = vscode.window.visibleTextEditors.find(
+          e => e.document.uri.toString() === doc.uri.toString()
+        );
+        return { document: doc, editor };
+      } catch {
+        return undefined;
+      }
+    }
+    return getActiveMarkdownContext();
+  };
+
+  // Agent API Handlers (Programmatic access for AI agents and automation)
+  const agentGetCommentsHandler = async (args?: {
+    uri?: string | vscode.Uri;
+    includeResolved?: boolean;
+  }) => {
+    const ctx = await resolveDocumentContext(args?.uri);
+    if (!ctx) {
+      return [];
+    }
+    const comments = commentService.getComments(ctx.document);
+    if (args?.includeResolved === false) {
+      return comments.filter(c => !c.resolved);
+    }
+    return comments;
+  };
+
+  const agentPostCommentHandler = async (args: {
+    uri?: string | vscode.Uri;
+    anchorText: string;
+    content: string;
+    author?: string;
+  }) => {
+    const ctx = await resolveDocumentContext(args?.uri);
+    if (!ctx || !args?.anchorText || !args?.content) {
+      return null;
+    }
+    const comment = await commentService.addCommentByAnchorText(
+      ctx.document,
+      args.anchorText,
+      args.content
+    );
+    if (comment && args.author) {
+      comment.author = args.author;
+      const comments = commentService.getComments(ctx.document);
+      await commentService.saveComments(ctx.document, comments);
+    }
+    if (comment) {
+      await saveDocumentIfCustomEditor(ctx);
+      await refreshForContext(ctx.document, ctx.editor);
+    }
+    return comment;
+  };
+
+  const agentReplyCommentHandler = async (args: {
+    uri?: string | vscode.Uri;
+    commentId: string;
+    content: string;
+    author?: string;
+  }) => {
+    const ctx = await resolveDocumentContext(args?.uri);
+    if (!ctx || !args?.commentId || !args?.content) {
+      return null;
+    }
+    const reply = await commentService.addReply(ctx.document, args.commentId, args.content);
+    if (reply && args.author) {
+      reply.author = args.author;
+      const comments = commentService.getComments(ctx.document);
+      await commentService.saveComments(ctx.document, comments);
+    }
+    if (reply) {
+      await saveDocumentIfCustomEditor(ctx);
+      await refreshForContext(ctx.document, ctx.editor);
+    }
+    return reply;
+  };
+
+  const agentResolveCommentHandler = async (args: {
+    uri?: string | vscode.Uri;
+    commentId: string;
+    resolved?: boolean;
+  }) => {
+    const ctx = await resolveDocumentContext(args?.uri);
+    if (!ctx || !args?.commentId) {
+      return null;
+    }
+    const comment = commentService.findComment(ctx.document, args.commentId);
+    if (!comment) {
+      return null;
+    }
+    if (typeof args.resolved === 'boolean') {
+      if (comment.resolved !== args.resolved) {
+        comment.resolved = args.resolved;
+        comment.updatedAt = new Date().toISOString();
+        const comments = commentService.getComments(ctx.document);
+        await commentService.saveComments(ctx.document, comments);
+      }
+    } else {
+      await commentService.resolveComment(ctx.document, args.commentId);
+    }
+    await saveDocumentIfCustomEditor(ctx);
+    await refreshForContext(ctx.document, ctx.editor);
+    return commentService.findComment(ctx.document, args.commentId) || null;
+  };
+
+  const agentDeleteCommentHandler = async (args: {
+    uri?: string | vscode.Uri;
+    commentId: string;
+  }) => {
+    const ctx = await resolveDocumentContext(args?.uri);
+    if (!ctx || !args?.commentId) {
+      return { success: false };
+    }
+    const success = await commentService.deleteComment(ctx.document, args.commentId);
+    if (success) {
+      await saveDocumentIfCustomEditor(ctx);
+      await refreshForContext(ctx.document, ctx.editor);
+    }
+    return { success };
+  };
+
+  const applyPresetHandler = async (presetName?: string) => {
+    const presets = [
+      { label: 'default', description: 'Standard in-file Markdown storage, balanced UI' },
+      { label: 'documentation-site', description: 'Clean reading, lightweight chips, minimal UI overhead' },
+      { label: 'git-file-review', description: 'Strict line anchoring, side-by-side diff focus, VC friendly' },
+      { label: 'browser-annotator', description: 'High-contrast highlights, floating thread panels' },
+      { label: 'team-collaboration', description: 'Full threading, author avatars, resolution workflows' },
+      { label: 'ai-agent-reviewer', description: 'Agent badges, structured JSON output, automated check hooks' }
+    ];
+
+    let selectedPreset = presetName;
+    if (!selectedPreset) {
+      const picked = await vscode.window.showQuickPick(presets, {
+        placeHolder: 'Select OmniComment Preset Profile'
+      });
+      if (!picked) {
+        return;
+      }
+      selectedPreset = picked.label;
+    }
+
+    const config = vscode.workspace.getConfiguration('omnicomment');
+    await config.update('preset', selectedPreset, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`OmniComment preset applied: ${selectedPreset}`);
+  };
+
+  // Register Agent APIs under omnicomment.agent.* and markco.agent.*
+  context.subscriptions.push(
+    vscode.commands.registerCommand('omnicomment.agent.getComments', agentGetCommentsHandler),
+    vscode.commands.registerCommand('markco.agent.getComments', agentGetCommentsHandler),
+    vscode.commands.registerCommand('omnicomment.agent.postComment', agentPostCommentHandler),
+    vscode.commands.registerCommand('markco.agent.postComment', agentPostCommentHandler),
+    vscode.commands.registerCommand('omnicomment.agent.replyComment', agentReplyCommentHandler),
+    vscode.commands.registerCommand('markco.agent.replyComment', agentReplyCommentHandler),
+    vscode.commands.registerCommand('omnicomment.agent.resolveComment', agentResolveCommentHandler),
+    vscode.commands.registerCommand('markco.agent.resolveComment', agentResolveCommentHandler),
+    vscode.commands.registerCommand('omnicomment.agent.deleteComment', agentDeleteCommentHandler),
+    vscode.commands.registerCommand('markco.agent.deleteComment', agentDeleteCommentHandler),
+    vscode.commands.registerCommand('omnicomment.applyPreset', applyPresetHandler),
+    vscode.commands.registerCommand('markco.applyPreset', applyPresetHandler)
+  );
+
+  // Register OmniComment aliases for core commands
+  const aliasCommands: [string, string][] = [
+    ['omnicomment.addComment', 'markco.addComment'],
+    ['omnicomment.deleteComment', 'markco.deleteComment'],
+    ['omnicomment.editComment', 'markco.editComment'],
+    ['omnicomment.toggleSidebar', 'markco.toggleSidebar'],
+    ['omnicomment.navigateToComment', 'markco.navigateToComment'],
+    ['omnicomment.editorCommentAction', 'markco.editorCommentAction'],
+    ['omnicomment.inlineReplyComment', 'markco.inlineReplyComment'],
+    ['omnicomment.inlineToggleResolve', 'markco.inlineToggleResolve'],
+    ['omnicomment.inlineDeleteThread', 'markco.inlineDeleteThread'],
+    ['omnicomment.inlineDeleteCommentItem', 'markco.inlineDeleteCommentItem'],
+    ['omnicomment.toggleCollapseAllComments', 'markco.toggleCollapseAllComments']
+  ];
+
+  for (const [omniCmd, markcoCmd] of aliasCommands) {
+    context.subscriptions.push(
+      vscode.commands.registerCommand(omniCmd, (...args: any[]) =>
+        vscode.commands.executeCommand(markcoCmd, ...args)
+      )
+    );
+  }
+
   // Listen for active editor changes
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(async editor => {

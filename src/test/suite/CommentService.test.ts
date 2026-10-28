@@ -88,6 +88,30 @@ suite('CommentService Test Suite', () => {
       assert.strictEqual(comments[0].anchor.text, 'text with -->');
       assert.strictEqual(comments[0].content, 'comment with -->');
     });
+
+    test('should parse valid comment block from <!-- omnicomment format', () => {
+      const commentData = {
+        version: 2,
+        comments: [
+          {
+            id: 'omni-test-id-1',
+            anchor: { text: 'Hello', startLine: 0, startChar: 0, endLine: 0, endChar: 5 },
+            content: 'Universal annotation from agent',
+            author: 'OmniAgent',
+            createdAt: '2026-10-28T00:00:00.000Z'
+          }
+        ]
+      };
+      const documentText = `# Hello\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
+      const mockDocument = createMockDocument(documentText);
+
+      const comments = commentService.parseComments(mockDocument);
+
+      assert.strictEqual(comments.length, 1);
+      assert.strictEqual(comments[0].id, 'omni-test-id-1');
+      assert.strictEqual(comments[0].content, 'Universal annotation from agent');
+      assert.strictEqual(comments[0].author, 'OmniAgent');
+    });
   });
 
   suite('getComments', () => {

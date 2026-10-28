@@ -7,6 +7,7 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 const COMMENT_BLOCK_START = '<!-- markco-comments';
+const COMMENT_BLOCK_ALIASES = ['<!-- omnicomment', '<!-- markco-comments'];
 const COMMENT_BLOCK_END = '-->';
 const CURRENT_VERSION = 2;
 
@@ -76,28 +77,49 @@ function isInsideCodeContext(text: string, position: number): boolean {
   return false;
 }
 
+interface CommentBlockLocation {
+  index: number;
+  marker: string;
+}
+
+/**
+ * Find the location and matched marker of the comment block, ignoring code contexts.
+ * Supports both standard '<!-- markco-comments' and modern '<!-- omnicomment' blocks.
+ */
+function findCommentBlockLocation(text: string): CommentBlockLocation | null {
+  let latestIndex = -1;
+  let latestMarker = '';
+
+  for (const marker of COMMENT_BLOCK_ALIASES) {
+    let searchStart = text.length;
+    while (searchStart > 0) {
+      const index = text.lastIndexOf(marker, searchStart - 1);
+      if (index === -1) {
+        break;
+      }
+      if (!isInsideCodeContext(text, index)) {
+        if (index > latestIndex) {
+          latestIndex = index;
+          latestMarker = marker;
+        }
+        break;
+      }
+      searchStart = index;
+    }
+  }
+
+  if (latestIndex === -1) {
+    return null;
+  }
+  return { index: latestIndex, marker: latestMarker };
+}
+
 /**
  * Find the actual comment block position, ignoring those inside code fences or inline code
  */
 function findCommentBlockStart(text: string): number {
-  let searchStart = text.length;
-  
-  while (searchStart > 0) {
-    const index = text.lastIndexOf(COMMENT_BLOCK_START, searchStart - 1);
-    if (index === -1) {
-      return -1;
-    }
-    
-    // Check if this occurrence is inside a code context (fence or inline)
-    if (!isInsideCodeContext(text, index)) {
-      return index;
-    }
-    
-    // Continue searching before this position
-    searchStart = index;
-  }
-  
-  return -1;
+  const loc = findCommentBlockLocation(text);
+  return loc ? loc.index : -1;
 }
 
 /**
@@ -138,19 +160,20 @@ export class CommentService {
     const uri = document.uri.toString();
     const text = document.getText();
 
-    const startIndex = findCommentBlockStart(text);
-    if (startIndex === -1) {
+    const blockLoc = findCommentBlockLocation(text);
+    if (!blockLoc) {
       this.commentCache.set(uri, []);
       return [];
     }
 
+    const startIndex = blockLoc.index;
     const endIndex = text.indexOf(COMMENT_BLOCK_END, startIndex);
     if (endIndex === -1) {
       this.commentCache.set(uri, []);
       return [];
     }
 
-    const jsonStart = startIndex + COMMENT_BLOCK_START.length;
+    const jsonStart = startIndex + blockLoc.marker.length;
     const jsonText = text.substring(jsonStart, endIndex).trim();
 
     // Validate that the content looks like a JSON object before parsing
@@ -215,12 +238,14 @@ export class CommentService {
       version: CURRENT_VERSION,
       comments: sanitizedComments
     };
-    const jsonBlock = `${COMMENT_BLOCK_START}\n${JSON.stringify(data, null, 2)}\n${COMMENT_BLOCK_END}`;
+
+    const blockLoc = findCommentBlockLocation(text);
+    const marker = blockLoc ? blockLoc.marker : COMMENT_BLOCK_START;
+    const jsonBlock = `${marker}\n${JSON.stringify(data, null, 2)}\n${COMMENT_BLOCK_END}`;
 
     const edit = new vscode.WorkspaceEdit();
-    const startIndex = findCommentBlockStart(text);
 
-    if (startIndex === -1) {
+    if (!blockLoc) {
       // No existing block, append at end
       const lastLine = document.lineCount - 1;
       const lastChar = document.lineAt(lastLine).text.length;
@@ -228,6 +253,7 @@ export class CommentService {
       edit.insert(document.uri, insertPosition, '\n\n' + jsonBlock);
     } else {
       // Replace existing block
+      const startIndex = blockLoc.index;
       const endIndex = text.indexOf(COMMENT_BLOCK_END, startIndex);
       if (endIndex !== -1) {
         const startPos = document.positionAt(startIndex);
@@ -240,7 +266,7 @@ export class CommentService {
     
     // Debug logging
     console.log('Markco: applyEdit result:', success);
-    console.log('Markco: Inserting at end of file, startIndex was:', startIndex);
+    console.log('Markco: Inserting at end of file, startIndex was:', blockLoc ? blockLoc.index : -1);
     
     // Update cache after successful edit
     if (success) {

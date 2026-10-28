@@ -47,6 +47,7 @@ interface CommentData {
 }
 
 const COMMENT_BLOCK_START = '<!-- markco-comments';
+const COMMENT_BLOCK_ALIASES = ['<!-- omnicomment', '<!-- markco-comments'];
 const COMMENT_BLOCK_END = '-->';
 
 /**
@@ -140,64 +141,73 @@ function isInsideInlineCode(text: string, position: number): boolean {
 }
 
 /**
- * Parses the markco-comments JSON block from markdown source.
+ * Parses the comment JSON block from markdown source.
+ * Supports both standard '<!-- markco-comments' and modern '<!-- omnicomment' blocks.
  * Searches backwards to find the last valid (non-code-context) comment block.
  */
 function parseCommentsFromSource(src: string): Comment[] {
-  let searchStart = src.length;
-  
-  while (searchStart > 0) {
-    const blockStart = src.lastIndexOf(COMMENT_BLOCK_START, searchStart - 1);
-    if (blockStart === -1) {
+  let latestStart = -1;
+  let latestMarker = '';
+
+  for (const marker of COMMENT_BLOCK_ALIASES) {
+    let searchStart = src.length;
+    while (searchStart > 0) {
+      const blockStart = src.lastIndexOf(marker, searchStart - 1);
+      if (blockStart === -1) {
+        break;
+      }
+
+      // Check if inside code fence or inline code
+      if (isInsideCodeFence(src, blockStart) || isInsideInlineCode(src, blockStart)) {
+        searchStart = blockStart;
+        continue;
+      }
+
+      if (blockStart > latestStart) {
+        latestStart = blockStart;
+        latestMarker = marker;
+      }
+      break;
+    }
+  }
+
+  if (latestStart === -1) {
+    return [];
+  }
+
+  const blockEnd = src.indexOf(COMMENT_BLOCK_END, latestStart + latestMarker.length);
+  if (blockEnd === -1) {
+    return [];
+  }
+
+  const jsonStart = latestStart + latestMarker.length;
+  const jsonText = src.substring(jsonStart, blockEnd).trim();
+
+  // Validate that the content looks like JSON before parsing
+  if (!jsonText.startsWith('{')) {
+    return [];
+  }
+
+  try {
+    const data: CommentData = JSON.parse(jsonText);
+    if (!data.comments || !Array.isArray(data.comments)) {
       return [];
     }
 
-    // Check if inside code fence or inline code
-    if (isInsideCodeFence(src, blockStart) || isInsideInlineCode(src, blockStart)) {
-      searchStart = blockStart;
-      continue;
-    }
-
-    const blockEnd = src.indexOf(COMMENT_BLOCK_END, blockStart + COMMENT_BLOCK_START.length);
-    if (blockEnd === -1) {
-      searchStart = blockStart;
-      continue;
-    }
-
-    const jsonStart = blockStart + COMMENT_BLOCK_START.length;
-    const jsonText = src.substring(jsonStart, blockEnd).trim();
-
-    // Validate that the content looks like JSON before parsing
-    if (!jsonText.startsWith('{')) {
-      searchStart = blockStart;
-      continue;
-    }
-
-    try {
-      const data: CommentData = JSON.parse(jsonText);
-      if (!data.comments || !Array.isArray(data.comments)) {
-        return [];
-      }
-
-      // Restore sanitized text and filter out orphaned comments
-      return data.comments
-        .filter(c => !c.orphaned)
-        .map(comment => ({
-          ...comment,
-          anchor: {
-            ...comment.anchor,
-            text: restoreFromStorage(comment.anchor.text)
-          },
-          content: restoreFromStorage(comment.content)
-        }));
-    } catch {
-      // Invalid JSON, try searching before this position
-      searchStart = blockStart;
-      continue;
-    }
+    // Restore sanitized text and filter out orphaned comments
+    return data.comments
+      .filter(c => !c.orphaned)
+      .map(comment => ({
+        ...comment,
+        anchor: {
+          ...comment.anchor,
+          text: restoreFromStorage(comment.anchor.text)
+        },
+        content: restoreFromStorage(comment.content)
+      }));
+  } catch {
+    return [];
   }
-  
-  return [];
 }
 
 /**
