@@ -1,42 +1,63 @@
-# OmniComment Documentation
+# OmniComment Documentation Portal
 
-Welcome to the **OmniComment** documentation. OmniComment is a universal inline annotation, threaded discussion, and code commenting platform designed for multiple surfaces: VS Code editors, embeddable web pages, browser extensions, and autonomous AI agents.
+Welcome to the **OmniComment** documentation portal. OmniComment is a universal in-context commenting, inline annotation, and collaborative discussion platform designed for editors (VS Code), embeddable web documentation, browser extensions, terminals, and autonomous AI agents.
 
 ---
 
-## Documentation Index
+## Documentation Navigation
 
-| Guide | Description | Target Audience |
+```mermaid
+flowchart LR
+    HOME["Project Home Page\n(HOME.md)"]
+    TUTORIAL["Getting Started Tutorial\n(TUTORIAL.md)"]
+    API["API Reference\n(API_REFERENCE.md)"]
+    INTEGRATE["Integration Guide\n(INTEGRATION_GUIDE.md)"]
+    PRESETS["Configuration Presets\n(CONFIGURATION_PRESETS.md)"]
+    AGENT["AI Agent Guide\n(AGENT_API.md)"]
+    ARCH["Architecture Spec\n(ARCHITECTURE.md)"]
+
+    HOME --> TUTORIAL
+    HOME --> API
+    TUTORIAL --> INTEGRATE
+    TUTORIAL --> AGENT
+    API --> ARCH
+    API --> PRESETS
+```
+
+---
+
+## Complete Guide Index
+
+| Document | Purpose & Description | Target Audience |
 | :--- | :--- | :--- |
-| **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)** | Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM context serialization | AI Engineers, Agent Developers, Automation Tooling |
-| **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)** | Embedding OmniComment into any website, blogs, documentation sites, Chrome extensions, and VS Code | Frontend Devs, Site Authors, Extension Authors |
-| **[Configuration & Presets](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)** | The 5 built-in presets (`documentation-site`, `git-file-review`, etc.), UI styling tokens, and storage drivers | End Users, System Integrators |
-| **[Architecture & Data Model](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)** | Core monorepo packages, W3C Web Annotation schema, 3-tier fuzzy anchoring, and design principles | Core Contributors, Architects |
+| **[Project Home Page](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/HOME.md)** | High-impact overview, feature matrices, architecture diagram, and quickstarts. Ideal template for a project landing page or website root. | Everyone, Evaluators, Site Visitors |
+| **[Hands-on Tutorial](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/TUTORIAL.md)** | Complete step-by-step tutorial from zero to hero: VS Code workflows, presets, web embedding (`<omni-comment>`), browser extensions, and AI reviewer agents. | Developers, Content Writers, AI Engineers |
+| **[Comprehensive API Reference](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/API_REFERENCE.md)** | Complete formal specification of data structures (`Comment`, `Reply`, `CommentAnchor`), VS Code commands, `AnchorEngine`, storage adapters, and web component attributes. | API Integrators, Plugin Authors |
+| **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)** | Dedicated programmatic API manual for LLMs and autonomous agents, including MCP tool definitions and automated review loops. | AI Agent Developers, LLM Tool Builders |
+| **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)** | Instructions for integrating OmniComment into static site generators (Docusaurus, VitePress, Hugo), Chrome extensions, and TUI/Neovim. | Frontend Engineers, Web Authors |
+| **[Configuration & Presets](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)** | Detailed specifications for the 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`). | End Users, System Administrators |
+| **[Architecture & Data Model](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)** | Deep-dive architectural specification, monorepo package layout, 3-tier fuzzy anchoring mathematics, and storage block design. | Core Contributors, Architects |
 
 ---
 
-## Quick Navigation
+## Quick Reference Snippets
 
-### 1. For AI Agents & Automation
-OmniComment provides first-class commands and headless APIs:
-- `omnicomment.agent.getComments`
-- `omnicomment.agent.postComment`
-- `omnicomment.agent.replyComment`
-- `omnicomment.agent.resolveComment`
-- `omnicomment.agent.deleteComment`
-
-See the **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)** for complete request/response schemas, TypeScript definitions, and MCP tool declarations.
-
-### 2. For Web Developers
-Embed OmniComment into any HTML page or documentation framework with one script tag:
+### 1. Embed on Any Website
 ```html
 <script type="module" src="https://unpkg.com/@omnicomment/web-plugin/dist/index.js"></script>
-<omni-comment preset="documentation-site" target="#content"></omni-comment>
+<omni-comment target="#content" preset="documentation-site"></omni-comment>
 ```
-See the **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)** for Docusaurus, VitePress, Hugo, React, and Vue integrations.
 
-### 3. For Extension Users & Teams
-Switch between built-in configuration presets with zero boilerplate:
-- Run `OmniComment: Apply Preset Configuration...` in the VS Code Command Palette.
-- Select from: `documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, or `ai-agent-reviewer`.
-See the **[Configuration & Presets Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)**.
+### 2. Programmatic AI Agent Call
+```typescript
+await vscode.commands.executeCommand('omnicomment.agent.postComment', {
+  anchorText: 'const total = calculateSum(items);',
+  content: 'Consider adding input validation for empty arrays.',
+  author: 'GeminiCodeReviewer [AI]'
+});
+```
+
+### 3. CLI Terminal Inspection
+```bash
+npx ts-node src/cli/tuiRenderer.ts docs/ARCHITECTURE.md --unresolved
+```
