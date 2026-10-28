@@ -3,6 +3,7 @@
   "displayName": "OmniComment - Universal Comments & Annotations",
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
   "version": "0.1.15",
+  "license": "MIT",
   "publisher": "OrenMaoz",
   "repository": {
     "type": "git",
