@@ -5,7 +5,7 @@ import { mapVscodeLanguageToVditorLang } from "./lang.js";
 import { bindLinkErrors } from "./linkError.js";
 import { refreshExportDialogProState } from "./exportDialog.js";
 import { toggleMarkmapView, refreshMarkmapProLock } from "./markmapView.js";
-import { initMarkcoAnnotations } from "./markcoAnnotations.js";
+import { initOmniAnnotations, initMarkcoAnnotations } from "./omniAnnotations.js";
 
 
 const removeLockedDecorations = (root) => {
@@ -97,7 +97,7 @@ handler.on("open", async (md) => {
   applyProState(null, isPro)
   applyProCancelledState(null, isProCancelled)
   let editor;
-  let markcoAnnotations;
+  let omniAnnotations;
   const getMarkdownValue = createMarkdownValueReader(() => editor, workspaceBaseUrl);
   editor = new Vditor('vditor', {
     value: content,
@@ -185,7 +185,7 @@ handler.on("open", async (md) => {
     input(content) {
       const restored = restoreWorkspaceBaseUrls(content, workspaceBaseUrl);
       handler.emit("save", restored);
-      setTimeout(() => markcoAnnotations?.refreshHighlights(restored), 60);
+      setTimeout(() => omniAnnotations?.refreshHighlights(restored), 60);
     },
     upload: {
       url: '/image',
@@ -218,8 +218,8 @@ handler.on("open", async (md) => {
     },
     after() {
       bindLinkErrors(handler, editor);
-      markcoAnnotations = initMarkcoAnnotations(getMarkdownValue);
-      setTimeout(() => markcoAnnotations.refreshHighlights(content), 80);
+      omniAnnotations = initOmniAnnotations(getMarkdownValue);
+      setTimeout(() => omniAnnotations.refreshHighlights(content), 80);
       const { viewerSettings } = md;
       observeWorkspaceAbsoluteImages(document.getElementById('vditor'), workspaceBaseUrl);
       if (viewerSettings?.enabled) {
@@ -270,9 +270,9 @@ handler.on("open", async (md) => {
         if (document.querySelector("[data-type='yaml-front-matter'].vditor-code-block--cm .cm-editor.cm-focused")) {
           return;
         }
-        markcoAnnotations?.syncFromExternalUpdate?.(content);
+        omniAnnotations?.syncFromExternalUpdate?.(content);
         if (getMarkdownValue() === content) {
-          setTimeout(() => markcoAnnotations?.refreshHighlights(content), 40);
+          setTimeout(() => omniAnnotations?.refreshHighlights(content), 40);
           return;
         }
         const scrollContainer =
@@ -288,46 +288,60 @@ handler.on("open", async (md) => {
           if (scrollContainer) {
             scrollContainer.scrollTop = prevScrollTop;
           }
-          markcoAnnotations?.refreshHighlights(content);
+          omniAnnotations?.refreshHighlights(content);
         }, 50);
       })
-      handler.on("focusMarkcoComment", (payload) => {
-        if (payload && markcoAnnotations) {
-          markcoAnnotations.focusCommentById(payload.commentId, payload.anchorText);
+      const handleFocusComment = (payload) => {
+        if (payload && omniAnnotations) {
+          omniAnnotations.focusCommentById(payload.commentId, payload.anchorText);
         }
-      })
+      };
+      handler.on("focusOmniComment", handleFocusComment);
+      handler.on("focusMarkcoComment", handleFocusComment);
       handler.on("openAddCommentInEditor", (payload) => {
-        if (markcoAnnotations) {
-          markcoAnnotations.openAddCommentComposer(payload?.selectedText || '');
+        if (omniAnnotations) {
+          omniAnnotations.openAddCommentComposer(payload?.selectedText || '');
         }
       })
-      handler.on("queryMarkcoInlineState", (payload) => {
+      const handleQueryInlineState = (payload) => {
         if (payload?.inputSelector && typeof payload.inputValue === 'string') {
-          const inputEl = document.querySelector(payload.inputSelector);
+          let inputEl = document.querySelector(payload.inputSelector);
+          if (!inputEl && payload.inputSelector.includes('markco')) {
+            inputEl = document.querySelector(payload.inputSelector.replace(/markco/g, 'omni'));
+          } else if (!inputEl && payload.inputSelector.includes('omni')) {
+            inputEl = document.querySelector(payload.inputSelector.replace(/omni/g, 'markco'));
+          }
           if (inputEl && 'value' in inputEl) {
             inputEl.value = payload.inputValue;
             inputEl.dispatchEvent(new Event('input', { bubbles: true }));
           }
         }
         if (payload?.clickSelector) {
-          const btn = document.querySelector(payload.clickSelector);
+          let btn = document.querySelector(payload.clickSelector);
+          if (!btn && payload.clickSelector.includes('markco')) {
+            btn = document.querySelector(payload.clickSelector.replace(/markco/g, 'omni'));
+          } else if (!btn && payload.clickSelector.includes('omni')) {
+            btn = document.querySelector(payload.clickSelector.replace(/omni/g, 'markco'));
+          }
           if (btn instanceof HTMLElement) {
             btn.click();
           }
         }
-        const state = markcoAnnotations?.getInlineState?.() || null;
+        const state = omniAnnotations?.getInlineState?.() || null;
         handler.emit("command", {
-          command: "markco.editorCommentAction",
+          command: "omnicomment.editorCommentAction",
           args: [{ type: "reportInlineState", state }]
         });
-      })
+      };
+      handler.on("queryOmniInlineState", handleQueryInlineState);
+      handler.on("queryMarkcoInlineState", handleQueryInlineState);
       handler.on("insertImageMarkdown", (markdown) => {
         editor.insertMarkdown(markdown);
       })
       handler.on("gotoBlock", (fragment) => {
-        if (typeof fragment === 'string' && fragment.startsWith('markco:')) {
+        if (typeof fragment === 'string' && (fragment.startsWith('omnicomment:') || fragment.startsWith('markco:'))) {
           const [, commentId, ...rest] = fragment.split(':');
-          markcoAnnotations?.focusCommentById(commentId, rest.join(':'));
+          omniAnnotations?.focusCommentById(commentId, rest.join(':'));
           return;
         }
         if (fragment) {

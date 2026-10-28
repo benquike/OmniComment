@@ -274,14 +274,15 @@ const getCursorOrSelectedPlainText = () => {
 
 const triggerAddComment = async (fallbackText = '') => {
     const text = (getCursorOrSelectedPlainText() || fallbackText || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
-    if (typeof window.__markcoOpenAddComment === 'function') {
-        window.__markcoOpenAddComment(text)
+    const openAddComment = window.__omniOpenAddComment || window.__markcoOpenAddComment
+    if (typeof openAddComment === 'function') {
+        openAddComment(text)
         return
     }
     if (text) {
         await copyPlainText(text)
     }
-    vscodeEvent.emit('command', 'markco.addComment')
+    vscodeEvent.emit('command', 'omnicomment.addComment')
 }
 
 const copyHtml = async (html) => {

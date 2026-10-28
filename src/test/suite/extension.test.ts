@@ -8,12 +8,13 @@ import {
   isMarkdownCompatibleUri,
   getUriFromTabInput
 } from '../../extension';
+import { CommentSidebarProvider } from '../../providers/CommentSidebarProvider';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
 
 suite('Extension Test Suite', () => {
-  vscode.window.showInformationMessage('Starting Markco extension tests');
+  vscode.window.showInformationMessage('Starting OmniComment extension tests');
 
   suite('Extension Activation', () => {
     test('Extension should be present', () => {
@@ -28,12 +29,12 @@ suite('Extension Test Suite', () => {
       // Get all registered commands
       const commands = await vscode.commands.getCommands(true);
       
-      // Check that Markco commands are registered when extension is active
-      const markcoCommands = commands.filter(cmd => cmd.startsWith('markco.'));
+      // Check that OmniComment / Markco commands are registered when extension is active
+      const omniCommands = commands.filter(cmd => cmd.startsWith('omnicomment.') || cmd.startsWith('markco.'));
       
       // If extension is active, commands should be registered
       // Note: In test environment, extension may not auto-activate
-      assert.ok(Array.isArray(markcoCommands), 'Commands array is accessible');
+      assert.ok(Array.isArray(omniCommands), 'Commands array is accessible');
     });
   });
 
@@ -209,18 +210,19 @@ suite('Extension Test Suite', () => {
 
   suite('Webview Provider', () => {
     test('Should have valid view type', () => {
-      const viewType = 'markco.commentSidebar';
-      assert.ok(viewType.startsWith('markco.'));
+      const viewType = CommentSidebarProvider.viewType;
+      assert.ok(viewType.startsWith('omnicomment.') || viewType.startsWith('markco.'));
     });
   });
 
   suite('Configuration', () => {
     test('Should access configuration values', () => {
-      const config = vscode.workspace.getConfiguration('markco');
+      const config = vscode.workspace.getConfiguration('omnicomment');
+      const legacyConfig = vscode.workspace.getConfiguration('markco');
       
       // Get default values or configured values
-      const highlightColor = config.get<string>('highlightColor');
-      const highlightBorderColor = config.get<string>('highlightBorderColor');
+      const highlightColor = config.get<string>('highlightColor') || legacyConfig.get<string>('highlightColor');
+      const highlightBorderColor = config.get<string>('highlightBorderColor') || legacyConfig.get<string>('highlightBorderColor');
       
       // Values may be undefined if extension not active, but API should work
       assert.ok(config !== undefined, 'Configuration object is accessible');

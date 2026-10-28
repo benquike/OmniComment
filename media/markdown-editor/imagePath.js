@@ -51,33 +51,40 @@ export function restoreWorkspaceBaseUrls(markdown, workspaceBaseUrl) {
     const restored = workspaceBaseUrl
         ? markdown.split(workspaceBaseUrl.replace(/\/$/, '')).join('')
         : markdown;
-    return typeof window.__markcoSyncMarkdownBlock === 'function'
-        ? window.__markcoSyncMarkdownBlock(restored)
+    const syncFn = window.__omniSyncMarkdownBlock || window.__markcoSyncMarkdownBlock;
+    return typeof syncFn === 'function'
+        ? syncFn(restored)
         : restored;
 }
 
 export function readMarkdownWithOriginalImagePaths(editor, root, workspaceBaseUrl) {
     const rewrittenImages = Array.from(root?.querySelectorAll?.('img[data-workspace-absolute-src]') ?? []);
-    const markcoZoneEls = Array.from(root?.querySelectorAll?.('[data-markco-zone], [data-markco-comments]') ?? []);
-    const savedMarkcoAttrs = markcoZoneEls.map(el => ({
+    const zoneEls = Array.from(root?.querySelectorAll?.('[data-omni-zone], [data-markco-zone], [data-omni-comments], [data-markco-comments]') ?? []);
+    const savedAttrs = zoneEls.map(el => ({
         el,
-        zone: el.getAttribute('data-markco-zone'),
-        comments: el.getAttribute('data-markco-comments'),
+        omniZone: el.getAttribute('data-omni-zone'),
+        markcoZone: el.getAttribute('data-markco-zone'),
+        omniComments: el.getAttribute('data-omni-comments'),
+        markcoComments: el.getAttribute('data-markco-comments'),
     }));
     try {
         for (const img of rewrittenImages) {
             img.setAttribute('src', img.dataset.workspaceAbsoluteSrc);
         }
-        for (const item of savedMarkcoAttrs) {
+        for (const item of savedAttrs) {
+            item.el.removeAttribute('data-omni-zone');
             item.el.removeAttribute('data-markco-zone');
+            item.el.removeAttribute('data-omni-comments');
             item.el.removeAttribute('data-markco-comments');
         }
         return restoreWorkspaceBaseUrls(editor?.getValue(), workspaceBaseUrl);
     } finally {
         rewriteWorkspaceAbsoluteImages(root, workspaceBaseUrl);
-        for (const item of savedMarkcoAttrs) {
-            if (item.zone !== null) item.el.setAttribute('data-markco-zone', item.zone);
-            if (item.comments !== null) item.el.setAttribute('data-markco-comments', item.comments);
+        for (const item of savedAttrs) {
+            if (item.omniZone !== null) item.el.setAttribute('data-omni-zone', item.omniZone);
+            if (item.markcoZone !== null) item.el.setAttribute('data-markco-zone', item.markcoZone);
+            if (item.omniComments !== null) item.el.setAttribute('data-omni-comments', item.omniComments);
+            if (item.markcoComments !== null) item.el.setAttribute('data-markco-comments', item.markcoComments);
         }
     }
 }

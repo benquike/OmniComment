@@ -6,8 +6,7 @@ import { CommentDecorator } from './decorators/CommentDecorator';
 import { CommentSidebarProvider } from './providers/CommentSidebarProvider';
 import {
   InlineCommentController,
-  OmniCommentInlineItem,
-  MarkcoInlineCommentItem
+  OmniCommentInlineItem
 } from './providers/InlineCommentController';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 
@@ -20,21 +19,22 @@ let pendingInlineStateResolver: ((state: any) => void) | undefined;
 
 /**
  * Automatically ensures any installed `cweijan.vscode-office` ("Markdown Editor") extension
- * has the latest inlined comment widget assets (`markcoAnnotations.js`, `index.js`, `util.js`,
+ * has the latest inlined comment widget assets (`omniAnnotations.js`, `markcoAnnotations.js`, `index.js`, `util.js`,
  * `imagePath.js`, `index.css`) synced into its `resource/markdown/` directory.
  */
-function syncMarkdownEditorIntegration(markcoExtPath: string): void {
+function syncMarkdownEditorIntegration(extPath: string): void {
   try {
     const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
     if (!officeExt?.extensionPath) {
       return;
     }
-    const srcDir = path.join(markcoExtPath, 'media', 'markdown-editor');
+    const srcDir = path.join(extPath, 'media', 'markdown-editor');
     const dstDir = path.join(officeExt.extensionPath, 'resource', 'markdown');
     if (!fs.existsSync(srcDir) || !fs.existsSync(dstDir)) {
       return;
     }
     for (const file of [
+      'omniAnnotations.js',
       'markcoAnnotations.js',
       'index.js',
       'util.js',
@@ -52,7 +52,7 @@ function syncMarkdownEditorIntegration(markcoExtPath: string): void {
       }
     }
   } catch (err) {
-    console.warn('Markco: Could not auto-sync Markdown Editor assets:', err);
+    console.warn('OmniComment: Could not auto-sync Markdown Editor assets:', err);
   }
 }
 
@@ -148,7 +148,7 @@ export async function getActiveMarkdownContext(preferredUri?: vscode.Uri): Promi
       );
       return { document, editor: matchingEditor };
     } catch (err) {
-      console.error('Markco: Failed to open preferred URI:', err);
+      console.error('OmniComment: Failed to open preferred URI:', err);
     }
   }
 
@@ -182,7 +182,7 @@ export async function getActiveMarkdownContext(preferredUri?: vscode.Uri): Promi
         );
         return { document, editor: matchingEditor };
       } catch (err) {
-        console.error('Markco: Failed to open document from active tab:', err);
+        console.error('OmniComment: Failed to open document from active tab:', err);
       }
     } else {
       // Active tab has a URI that is NOT markdown-compatible
@@ -288,7 +288,7 @@ async function saveDocumentIfCustomEditor(ctx: {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Markco extension is now active');
+  console.log('OmniComment extension is now active');
 
   syncMarkdownEditorIntegration(context.extensionPath);
 
@@ -303,11 +303,11 @@ export function activate(context: vscode.ExtensionContext) {
     context.extensionUri,
     // Navigate callback
     async (commentId: string) => {
-      console.log('Markco: Navigate to comment:', commentId);
+      console.log('OmniComment: Navigate to comment:', commentId);
       const ctx = await getActiveMarkdownContext();
       if (ctx) {
         const comment = commentService.findComment(ctx.document, commentId);
-        console.log('Markco: Found comment:', comment);
+        console.log('OmniComment: Found comment:', comment);
         sidebarProvider.focusComment(commentId);
         if (comment && ctx.editor) {
           commentDecorator.navigateToComment(ctx.editor, comment);
@@ -315,14 +315,23 @@ export function activate(context: vscode.ExtensionContext) {
         } else if (comment) {
           vscode.commands
             .executeCommand(
-              'office.markdown.focusMarkcoComment',
+              'office.markdown.focusOmniComment',
               comment.id,
               comment.anchor.text
+            )
+            .then(
+              undefined,
+              () =>
+                vscode.commands.executeCommand(
+                  'office.markdown.focusMarkcoComment',
+                  comment.id,
+                  comment.anchor.text
+                )
             )
             .then(undefined, () => {});
         }
       } else {
-        console.log('Markco: No markdown document active');
+        console.log('OmniComment: No markdown document active');
       }
     },
     // Delete callback
@@ -553,19 +562,19 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.addComment', addCommentCommand)
+    vscode.commands.registerCommand('omnicomment.addComment', addCommentCommand)
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.deleteComment', deleteCommentCommand)
+    vscode.commands.registerCommand('omnicomment.deleteComment', deleteCommentCommand)
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.editComment', editCommentCommand)
+    vscode.commands.registerCommand('omnicomment.editComment', editCommentCommand)
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.toggleSidebar', async () => {
+    vscode.commands.registerCommand('omnicomment.toggleSidebar', async () => {
       const ctx = await getActiveMarkdownContext();
       if (ctx) {
         inlineCommentController.toggleAllThreads(ctx.document.uri);
@@ -574,7 +583,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.navigateToComment', async (commentId: string) => {
+    vscode.commands.registerCommand('omnicomment.navigateToComment', async (commentId: string) => {
       const ctx = await getActiveMarkdownContext();
       if (ctx) {
         const comment = commentService.findComment(ctx.document, commentId);
@@ -587,9 +596,18 @@ export function activate(context: vscode.ExtensionContext) {
           } else {
             vscode.commands
               .executeCommand(
-                'office.markdown.focusMarkcoComment',
+                'office.markdown.focusOmniComment',
                 comment.id,
                 comment.anchor.text
+              )
+              .then(
+                undefined,
+                () =>
+                  vscode.commands.executeCommand(
+                    'office.markdown.focusMarkcoComment',
+                    comment.id,
+                    comment.anchor.text
+                  )
               )
               .then(undefined, () => {});
           }
@@ -600,7 +618,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // In-editor comment action handler for custom editors (e.g. "Markdown Editor")
   context.subscriptions.push(
-    vscode.commands.registerCommand('markco.editorCommentAction', async (payload: {
+    vscode.commands.registerCommand('omnicomment.editorCommentAction', async (payload: {
       type:
         | 'addComment'
         | 'addReply'
@@ -734,7 +752,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Native VS Code Inline Comment Thread commands (for standard text editor)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'markco.inlineReplyComment',
+      'omnicomment.inlineReplyComment',
       async (reply: vscode.CommentReply) => {
         if (!reply || !reply.text.trim()) {
           return;
@@ -765,7 +783,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
     vscode.commands.registerCommand(
-      'markco.inlineToggleResolve',
+      'omnicomment.inlineToggleResolve',
       async (thread: vscode.CommentThread) => {
         if (!thread) {
           return;
@@ -784,7 +802,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
     vscode.commands.registerCommand(
-      'markco.inlineDeleteThread',
+      'omnicomment.inlineDeleteThread',
       async (thread: vscode.CommentThread) => {
         if (!thread) {
           return;
@@ -804,8 +822,8 @@ export function activate(context: vscode.ExtensionContext) {
       }
     ),
     vscode.commands.registerCommand(
-      'markco.inlineDeleteCommentItem',
-      async (item: MarkcoInlineCommentItem) => {
+      'omnicomment.inlineDeleteCommentItem',
+      async (item: OmniCommentInlineItem) => {
         if (!item) {
           return;
         }
@@ -822,7 +840,7 @@ export function activate(context: vscode.ExtensionContext) {
         await refreshForContext(ctx.document, ctx.editor);
       }
     ),
-    vscode.commands.registerCommand('markco.toggleCollapseAllComments', async () => {
+    vscode.commands.registerCommand('omnicomment.toggleCollapseAllComments', async () => {
       const ctx = await getActiveMarkdownContext();
       if (ctx) {
         inlineCommentController.toggleAllThreads(ctx.document.uri);
@@ -1006,32 +1024,31 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('markco.applyPreset', applyPresetHandler)
   );
 
-  // Register OmniComment aliases for core commands
-  const aliasCommands: [string, string][] = [
-    ['omnicomment.addComment', 'markco.addComment'],
-    ['omnicomment.deleteComment', 'markco.deleteComment'],
-    ['omnicomment.editComment', 'markco.editComment'],
-    ['omnicomment.toggleSidebar', 'markco.toggleSidebar'],
-    ['omnicomment.navigateToComment', 'markco.navigateToComment'],
-    ['omnicomment.editorCommentAction', 'markco.editorCommentAction'],
-    ['omnicomment.inlineReplyComment', 'markco.inlineReplyComment'],
-    ['omnicomment.inlineToggleResolve', 'markco.inlineToggleResolve'],
-    ['omnicomment.inlineDeleteThread', 'markco.inlineDeleteThread'],
-    ['omnicomment.inlineDeleteCommentItem', 'markco.inlineDeleteCommentItem'],
-    ['omnicomment.toggleCollapseAllComments', 'markco.toggleCollapseAllComments']
+  // Register backward compatibility aliases for markco.*, OmniComment.*, and OminiComment.*
+  const aliasActionNames = [
+    'addComment',
+    'deleteComment',
+    'editComment',
+    'toggleSidebar',
+    'navigateToComment',
+    'editorCommentAction',
+    'inlineReplyComment',
+    'inlineToggleResolve',
+    'inlineDeleteThread',
+    'inlineDeleteCommentItem',
+    'toggleCollapseAllComments'
   ];
 
-  for (const [omniCmd, markcoCmd] of aliasCommands) {
-    const actionName = omniCmd.split('.')[1];
+  for (const action of aliasActionNames) {
     context.subscriptions.push(
-      vscode.commands.registerCommand(omniCmd, (...args: any[]) =>
-        vscode.commands.executeCommand(markcoCmd, ...args)
+      vscode.commands.registerCommand(`markco.${action}`, (...args: any[]) =>
+        vscode.commands.executeCommand(`omnicomment.${action}`, ...args)
       ),
-      vscode.commands.registerCommand(`OmniComment.${actionName}`, (...args: any[]) =>
-        vscode.commands.executeCommand(markcoCmd, ...args)
+      vscode.commands.registerCommand(`OmniComment.${action}`, (...args: any[]) =>
+        vscode.commands.executeCommand(`omnicomment.${action}`, ...args)
       ),
-      vscode.commands.registerCommand(`OminiComment.${actionName}`, (...args: any[]) =>
-        vscode.commands.executeCommand(markcoCmd, ...args)
+      vscode.commands.registerCommand(`OminiComment.${action}`, (...args: any[]) =>
+        vscode.commands.executeCommand(`omnicomment.${action}`, ...args)
       )
     );
   }
@@ -1374,20 +1391,27 @@ export async function queryMarkdownEditorInlineStateForTesting(
       clearTimeout(timer);
       resolve(state);
     };
-    vscode.commands
-      .executeCommand('office.markdown.queryMarkcoInlineState', {
-        clickSelector,
-        inputSelector,
-        inputValue
-      })
-      .then(undefined, () => {
-        clearTimeout(timer);
-        pendingInlineStateResolver = undefined;
-        resolve(null);
-      });
+    const payload = {
+      clickSelector,
+      inputSelector,
+      inputValue
+    };
+    (async () => {
+      try {
+        await vscode.commands.executeCommand('office.markdown.queryOmniInlineState', payload);
+      } catch {
+        try {
+          await vscode.commands.executeCommand('office.markdown.queryMarkcoInlineState', payload);
+        } catch {
+          clearTimeout(timer);
+          pendingInlineStateResolver = undefined;
+          resolve(null);
+        }
+      }
+    })();
   });
 }
 
 export function deactivate() {
-  console.log('Markco extension deactivated');
+  console.log('OmniComment extension deactivated');
 }

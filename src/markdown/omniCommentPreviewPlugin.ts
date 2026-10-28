@@ -1,6 +1,6 @@
 /**
  * markdown-it plugin for OmniComment preview highlighting.
- * Wraps commented anchor text in <span class="omni-highlight markco-highlight"> elements.
+ * Wraps commented anchor text in <span class="omni-highlight"> elements.
  */
 
 import type MarkdownIt from 'markdown-it';
@@ -81,7 +81,7 @@ function processFenceTokens(
     const tooltip = relevantComments.map(c => `@${c.author}: ${c.content}`).join('\n---\n');
 
     const openToken = new TokenCtor('html_block', '', 0);
-    openToken.content = `<div class="omni-code-commented markco-code-commented" title="${escapeHtml(tooltip)}">\n`;
+    openToken.content = `<div class="omni-code-commented" title="${escapeHtml(tooltip)}">\n`;
 
     const closeToken = new TokenCtor('html_block', '', 0);
     closeToken.content = '</div>\n';
@@ -140,8 +140,8 @@ function processInlineTokens(
         }
 
         const openTag = new TokenCtor('html_inline', '', 0);
-        const resolvedClass = comment.resolved ? ' omni-resolved markco-resolved' : '';
-        openTag.content = `<span class="omni-highlight markco-highlight${resolvedClass}" title="${escapeHtml(`@${comment.author}: ${comment.content}`)}">`;
+        const resolvedClass = comment.resolved ? ' omni-resolved' : '';
+        openTag.content = `<span class="omni-highlight${resolvedClass}" title="${escapeHtml(`@${comment.author}: ${comment.content}`)}">`;
         newChildren.push(openTag);
 
         const matchToken = new TokenCtor('text', '', 0);

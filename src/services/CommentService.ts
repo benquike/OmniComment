@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Comment, CommentAnchor, Reply } from '../core/types';
 import { AnchorEngine } from '../core/AnchorEngine';
-import { MarkdownStorageAdapter } from '../storage/MarkdownStorageAdapter';
+import { MarkdownStorageAdapter, OMNI_COMMENT_MARKER } from '../storage/MarkdownStorageAdapter';
 import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -79,7 +79,7 @@ export class CommentService {
     };
 
     const loc = MarkdownStorageAdapter.findCommentBlock(text);
-    const activeMarker = loc ? loc.marker : '<!-- markco-comments';
+    const activeMarker = loc ? loc.marker : OMNI_COMMENT_MARKER;
     const jsonBlock = `${activeMarker}\n${JSON.stringify(data, null, 2)}\n-->`;
 
     const edit = new vscode.WorkspaceEdit();

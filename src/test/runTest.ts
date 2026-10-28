@@ -4,7 +4,7 @@ import * as path from 'path';
 import { runTests } from '@vscode/test-electron';
 
 async function main() {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'markco-e2e-'));
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'omnicomment-e2e-'));
   const userDataDir = path.join(tempRoot, 'user-data');
   const extensionsDir = path.join(tempRoot, 'extensions');
   fs.mkdirSync(userDataDir, { recursive: true });

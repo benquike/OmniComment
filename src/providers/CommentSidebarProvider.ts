@@ -5,7 +5,8 @@ import { Comment, SidebarMessage } from '../types';
  * Provides the webview sidebar for displaying and managing comments
  */
 export class CommentSidebarProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'markco.commentSidebar';
+  public static readonly viewType = 'omnicomment.commentSidebar';
+  public static readonly legacyViewType = 'markco.commentSidebar';
   private _view?: vscode.WebviewView;
   private _comments: Comment[] = [];
   private _focusedCommentId: string | null = null;

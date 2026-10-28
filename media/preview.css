@@ -72,6 +72,7 @@
   position: relative;
 }
 
+.omni-code-commented::before,
 .markco-code-commented::before {
   content: '💬';
   position: absolute;
@@ -82,23 +83,27 @@
   z-index: 1;
 }
 
+.omni-code-commented.omni-resolved::before,
 .markco-code-commented.markco-resolved::before {
   content: '✓';
   color: #6a9955;
 }
 
 /* Diagram blocks (mermaid, etc.) - indicator with border since no inline highlights */
+.omni-code-commented.omni-diagram,
 .markco-code-commented.markco-diagram {
   border: 2px solid rgba(255, 212, 0, 0.5);
   border-radius: 4px;
   padding: 4px;
 }
 
+.omni-code-commented.omni-diagram.omni-resolved,
 .markco-code-commented.markco-diagram.markco-resolved {
   border-color: rgba(128, 128, 128, 0.4);
 }
 
 /* Diagram indicator - appears before diagram blocks */
+.omni-diagram-indicator,
 .markco-diagram-indicator {
   display: block;
   text-align: right;
@@ -108,6 +113,7 @@
   cursor: default;
 }
 
+.omni-diagram-indicator::after,
 .markco-diagram-indicator::after {
   content: '💬';
   font-size: 1.2em;
@@ -117,6 +123,7 @@
   border-radius: 4px 4px 0 0;
 }
 
+.omni-diagram-indicator.omni-resolved::after,
 .markco-diagram-indicator.markco-resolved::after {
   content: '✓';
   color: #6a9955;
@@ -125,46 +132,57 @@
 
 /* Dark theme adjustments */
 @media (prefers-color-scheme: dark) {
+  .omni-highlight,
   .markco-highlight {
     background-color: rgba(255, 212, 0, 0.25);
     border-bottom-color: rgba(255, 212, 0, 0.7);
   }
 
+  .omni-highlight:hover,
   .markco-highlight:hover {
     background-color: rgba(255, 212, 0, 0.4);
   }
 
+  .omni-highlight.omni-resolved,
   .markco-highlight.markco-resolved {
     background-color: rgba(128, 128, 128, 0.15);
     border-bottom-color: rgba(128, 128, 128, 0.4);
   }
 
+  .omni-highlight-code,
   .markco-highlight-code {
     background-color: rgba(255, 212, 0, 0.25);
   }
 
+  .omni-highlight-code.omni-resolved,
   .markco-highlight-code.markco-resolved {
     background-color: rgba(128, 128, 128, 0.15);
   }
 }
 
 /* VS Code theme variable overrides (when available) */
+body.vscode-dark .omni-highlight,
+body.vscode-high-contrast .omni-highlight,
 body.vscode-dark .markco-highlight,
 body.vscode-high-contrast .markco-highlight {
   background-color: rgba(255, 212, 0, 0.25);
   border-bottom-color: rgba(255, 212, 0, 0.7);
 }
 
+body.vscode-dark .omni-highlight-code,
+body.vscode-high-contrast .omni-highlight-code,
 body.vscode-dark .markco-highlight-code,
 body.vscode-high-contrast .markco-highlight-code {
   background-color: rgba(255, 212, 0, 0.25);
 }
 
+body.vscode-light .omni-highlight,
 body.vscode-light .markco-highlight {
   background-color: rgba(255, 212, 0, 0.3);
   border-bottom-color: rgba(255, 212, 0, 0.8);
 }
 
+body.vscode-light .omni-highlight-code,
 body.vscode-light .markco-highlight-code {
   background-color: rgba(255, 212, 0, 0.3);
 }

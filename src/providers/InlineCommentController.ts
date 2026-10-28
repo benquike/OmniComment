@@ -29,7 +29,7 @@ export class OmniCommentInlineItem implements vscode.Comment {
     this.author = { name: authorName };
     const dateStr = InlineCommentController.formatShortDate(createdAt);
     this.label = resolved && !replyId ? `${dateStr} · Resolved` : dateStr;
-    this.contextValue = replyId ? 'markcoReply' : 'markcoComment';
+    this.contextValue = replyId ? 'omniReply' : 'omniComment';
   }
 }
 
@@ -58,7 +58,7 @@ export class InlineCommentController implements vscode.Disposable {
           return [];
         }
         const text = document.getText();
-        const blockIdx = text.lastIndexOf('<!-- markco-comments');
+        const blockIdx = Math.max(text.lastIndexOf('<!-- omnicomment'), text.lastIndexOf('<!-- markco-comments'));
         const endLine =
           blockIdx !== -1
             ? Math.max(0, document.positionAt(blockIdx).line - 1)
@@ -121,7 +121,7 @@ export class InlineCommentController implements vscode.Disposable {
 
       const lineLabel = InlineCommentController.formatLineLabel(comment);
       const items: vscode.Comment[] = [
-        new MarkcoInlineCommentItem(
+        new OmniCommentInlineItem(
           comment.id,
           undefined,
           comment.content,
@@ -133,7 +133,7 @@ export class InlineCommentController implements vscode.Disposable {
         ),
         ...(comment.replies || []).map(
           (r: Reply) =>
-            new MarkcoInlineCommentItem(
+            new OmniCommentInlineItem(
               comment.id,
               r.id,
               r.content,

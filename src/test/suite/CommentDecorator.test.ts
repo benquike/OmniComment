@@ -13,9 +13,12 @@ const test = Mocha.test;
 const setup = Mocha.setup;
 const teardown = Mocha.teardown;
 
-// Load Markco.md as test data
-const markcoPath = path.join(__dirname, '../../../spec/Markco.md');
-const markcoContent = fs.readFileSync(markcoPath, 'utf-8');
+// Load OmniComment / Markco spec as test data
+const specPath = fs.existsSync(path.join(__dirname, '../../../spec/OmniComment.md'))
+  ? path.join(__dirname, '../../../spec/OmniComment.md')
+  : path.join(__dirname, '../../../spec/Markco.md');
+const specContent = fs.readFileSync(specPath, 'utf-8');
+const markcoContent = specContent;
 
 suite('CommentDecorator Test Suite', () => {
   let commentDecorator: CommentDecorator;

@@ -35,7 +35,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
   let tempDir: string;
 
   suiteSetup(async () => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'markco-e2e-files-'));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omnicomment-e2e-files-'));
     // Ensure extension is activated by opening a markdown document
     const initDoc = await vscode.workspace.openTextDocument({
       language: 'markdown',
@@ -52,7 +52,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     const filePath = path.join(tempDir, 'e2e-standard.md');
     fs.writeFileSync(
       filePath,
-      '# Standard Editor Test\n\nMarkco provides interactive commenting for Markdown files.\n',
+      '# Standard Editor Test\n\nOmniComment provides interactive commenting for Markdown files.\n',
       'utf-8'
     );
 
@@ -71,9 +71,9 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     );
     editor.selection = new vscode.Selection(selectionRange.start, selectionRange.end);
 
-    // Submit a new inline comment via markco.editorCommentAction
+    // Submit a new inline comment via omnicomment.editorCommentAction
     const commentText = 'E2E inline comment added in standard editor';
-    await vscode.commands.executeCommand('markco.editorCommentAction', {
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
       type: 'addComment',
       uri: fileUri,
       anchorText: targetPhrase,
@@ -135,7 +135,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     // Add comment and response directly in "Markdown Editor"
     const vditorCopiedSelection = 'This\u00A0paragraph has \u200Bbold text\u200B and inline code';
     const customCommentText = 'E2E comment inlined directly inside Markdown Editor view!';
-    await vscode.commands.executeCommand('markco.editorCommentAction', {
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
       type: 'addComment',
       uri: fileUri,
       anchorText: vditorCopiedSelection,
@@ -159,7 +159,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
 
     // Add a response (reply) directly via in-editor action
     const replyText = 'E2E response inlined inside the comment box!';
-    await vscode.commands.executeCommand('markco.editorCommentAction', {
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
       type: 'addReply',
       uri: fileUri,
       commentId: comments[0].id,
@@ -254,7 +254,8 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     await waitForCondition(() => {
       const diskContent = fs.readFileSync(filePath, 'utf-8');
       return (
-        diskContent.includes('<!-- markco-comments') &&
+        (diskContent.includes('<!-- omnicomment') ||
+          diskContent.includes('<!-- markco-comments')) &&
         diskContent.includes(customCommentText) &&
         diskContent.includes(replyText)
       );
