@@ -44,8 +44,8 @@ export class InlineCommentController implements vscode.Disposable {
 
   constructor() {
     this._controller = vscode.comments.createCommentController(
-      'markco-inline',
-      'Markco In-Editor Comments'
+      'omnicomment-inline',
+      'OmniComment In-Editor Comments'
     );
     this._controller.options = {
       prompt: 'Write a comment or response...',

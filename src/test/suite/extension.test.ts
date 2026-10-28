@@ -84,13 +84,13 @@ suite('Extension Test Suite', () => {
       assert.ok(packageJson.activationEvents.includes('onLanguage:skill'));
 
       const editorContextMenuItem = packageJson.contributes.menus['editor/context'].find(
-        (item: { command: string }) => item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
       );
       const editorTitleMenuItem = packageJson.contributes.menus['editor/title'].find(
-        (item: { command: string }) => item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
       );
       const keybindingItem = packageJson.contributes.keybindings.find(
-        (item: { command: string }) => item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
       );
 
       assert.ok(editorContextMenuItem);

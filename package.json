@@ -4,15 +4,15 @@
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
   "version": "0.1.0",
   "license": "MIT",
-  "publisher": "OrenMaoz",
+  "publisher": "benquike",
   "repository": {
     "type": "git",
-    "url": "https://github.com/babonet/Markco.git"
+    "url": "https://github.com/benquike/OmniComment.git"
   },
   "bugs": {
-    "url": "https://github.com/babonet/Markco/issues"
+    "url": "https://github.com/benquike/OmniComment/issues"
   },
-  "homepage": "https://github.com/babonet/Markco#readme",
+  "homepage": "https://github.com/benquike/OmniComment#readme",
   "icon": "media/omnicomment.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -31,61 +31,61 @@
   "contributes": {
     "commands": [
       {
-        "command": "markco.addComment",
+        "command": "omnicomment.addComment",
         "title": "Add Comment",
         "category": "OmniComment",
         "icon": "$(comment)"
       },
       {
-        "command": "markco.deleteComment",
+        "command": "omnicomment.deleteComment",
         "title": "Delete Comment",
         "category": "OmniComment"
       },
       {
-        "command": "markco.editComment",
+        "command": "omnicomment.editComment",
         "title": "Edit Comment",
         "category": "OmniComment"
       },
       {
-        "command": "markco.toggleSidebar",
+        "command": "omnicomment.toggleSidebar",
         "title": "Toggle Comment Sidebar",
         "category": "OmniComment"
       },
       {
-        "command": "markco.navigateToComment",
+        "command": "omnicomment.navigateToComment",
         "title": "Navigate to Comment",
         "category": "OmniComment"
       },
       {
-        "command": "markco.editorCommentAction",
+        "command": "omnicomment.editorCommentAction",
         "title": "In-Editor Comment Action",
         "category": "OmniComment"
       },
       {
-        "command": "markco.inlineReplyComment",
+        "command": "omnicomment.inlineReplyComment",
         "title": "Respond",
         "category": "OmniComment"
       },
       {
-        "command": "markco.inlineToggleResolve",
+        "command": "omnicomment.inlineToggleResolve",
         "title": "Resolve / Reopen Comment",
         "category": "OmniComment",
         "icon": "$(check)"
       },
       {
-        "command": "markco.inlineDeleteThread",
+        "command": "omnicomment.inlineDeleteThread",
         "title": "Delete Comment Thread",
         "category": "OmniComment",
         "icon": "$(trash)"
       },
       {
-        "command": "markco.inlineDeleteCommentItem",
+        "command": "omnicomment.inlineDeleteCommentItem",
         "title": "Delete Comment / Response",
         "category": "OmniComment",
         "icon": "$(trash)"
       },
       {
-        "command": "markco.toggleCollapseAllComments",
+        "command": "omnicomment.toggleCollapseAllComments",
         "title": "Collapse / Expand All In-Editor Comments",
         "category": "OmniComment",
         "icon": "$(collapse-all)"
@@ -126,52 +126,52 @@
       "editor/context": [
         {
           "when": "(editorLangId == markdown || editorLangId == skill) && editorHasSelection",
-          "command": "markco.addComment",
-          "group": "markco"
+          "command": "omnicomment.addComment",
+          "group": "omnicomment"
         }
       ],
       "editor/title": [
         {
           "when": "editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
-          "command": "markco.addComment",
+          "command": "omnicomment.addComment",
           "group": "navigation"
         },
         {
           "when": "editorLangId == markdown || editorLangId == skill",
-          "command": "markco.toggleCollapseAllComments",
+          "command": "omnicomment.toggleCollapseAllComments",
           "group": "navigation"
         }
       ],
       "comments/commentThread/context": [
         {
-          "command": "markco.inlineReplyComment",
-          "when": "commentController == markco-inline",
+          "command": "omnicomment.inlineReplyComment",
+          "when": "commentController == omnicomment-inline || commentController == markco-inline",
           "group": "inline"
         }
       ],
       "comments/commentThread/title": [
         {
-          "command": "markco.inlineToggleResolve",
-          "when": "commentController == markco-inline",
+          "command": "omnicomment.inlineToggleResolve",
+          "when": "commentController == omnicomment-inline || commentController == markco-inline",
           "group": "navigation@1"
         },
         {
-          "command": "markco.inlineDeleteThread",
-          "when": "commentController == markco-inline",
+          "command": "omnicomment.inlineDeleteThread",
+          "when": "commentController == omnicomment-inline || commentController == markco-inline",
           "group": "navigation@2"
         }
       ],
       "comments/comment/title": [
         {
-          "command": "markco.inlineDeleteCommentItem",
-          "when": "commentController == markco-inline",
+          "command": "omnicomment.inlineDeleteCommentItem",
+          "when": "commentController == omnicomment-inline || commentController == markco-inline",
           "group": "inline"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "markco.addComment",
+        "command": "omnicomment.addComment",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
         "when": "editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
@@ -193,15 +193,25 @@
           "default": "default",
           "description": "Pre-configured profile tailoring UI density, storage mode, and agent review capabilities"
         },
-        "markco.highlightColor": {
+        "omnicomment.highlightColor": {
           "type": "string",
           "default": "rgba(255, 212, 0, 0.3)",
           "description": "Background color for comment highlights"
         },
-        "markco.highlightBorderColor": {
+        "omnicomment.highlightBorderColor": {
           "type": "string",
           "default": "rgba(255, 212, 0, 0.8)",
           "description": "Border color for comment highlights"
+        },
+        "markco.highlightColor": {
+          "type": "string",
+          "default": "rgba(255, 212, 0, 0.3)",
+          "description": "Legacy background color for comment highlights (deprecated, use omnicomment.highlightColor)"
+        },
+        "markco.highlightBorderColor": {
+          "type": "string",
+          "default": "rgba(255, 212, 0, 0.8)",
+          "description": "Legacy border color for comment highlights (deprecated, use omnicomment.highlightBorderColor)"
         }
       }
     },

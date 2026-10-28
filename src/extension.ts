@@ -1022,8 +1022,15 @@ export function activate(context: vscode.ExtensionContext) {
   ];
 
   for (const [omniCmd, markcoCmd] of aliasCommands) {
+    const actionName = omniCmd.split('.')[1];
     context.subscriptions.push(
       vscode.commands.registerCommand(omniCmd, (...args: any[]) =>
+        vscode.commands.executeCommand(markcoCmd, ...args)
+      ),
+      vscode.commands.registerCommand(`OmniComment.${actionName}`, (...args: any[]) =>
+        vscode.commands.executeCommand(markcoCmd, ...args)
+      ),
+      vscode.commands.registerCommand(`OminiComment.${actionName}`, (...args: any[]) =>
         vscode.commands.executeCommand(markcoCmd, ...args)
       )
     );
