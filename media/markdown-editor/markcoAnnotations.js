@@ -791,7 +791,10 @@ export function initMarkcoAnnotations(getMarkdownValue) {
   }
 
   function renderThreadHtml(comment) {
-    const isCollapsed = collapsedComments.has(comment.id);
+    if (collapsedComments.has(comment.id)) {
+      return '';
+    }
+
     const isFocused = comment.id === focusedCommentId;
     const replies = comment.replies || [];
     const areRepliesCollapsed = collapsedReplies.has(comment.id);
@@ -803,13 +806,9 @@ export function initMarkcoAnnotations(getMarkdownValue) {
     return `
       <div class="markco-inline-thread ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
-    } ${isCollapsed ? 'is-collapsed' : ''}" data-comment-id="${escapeHtml(
-      comment.id
-    )}" ${isCollapsed ? 'style="display: none !important;"' : ''}>
+    }" data-comment-id="${escapeHtml(comment.id)}">
         <div class="markco-inline-thread__header">
-          <div class="markco-inline-thread__header-left" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
-            comment.id
-          )}">
+          <div class="markco-inline-thread__header-left">
             <span class="markco-inline-thread__status ${
               comment.resolved ? 'is-resolved' : 'is-unresolved'
             }">${statusLabel}</span>
@@ -832,17 +831,13 @@ export function initMarkcoAnnotations(getMarkdownValue) {
             </button>
             <button type="button" class="markco-inline-header-btn markco-collapse-chevron" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
               comment.id
-            )}" title="${isCollapsed ? 'Expand comment' : 'Collapse comment'}">
-              ${isCollapsed ? '⌄' : '⌃'}
+            )}" title="Collapse comment">
+              ⌃
             </button>
           </div>
         </div>
 
-        ${
-          isCollapsed
-            ? ''
-            : `
-          <div class="markco-inline-thread__body">
+        <div class="markco-inline-thread__body">
             <!-- Root Comment -->
             <div class="markco-inline-item markco-inline-item--root">
               <div class="markco-inline-item__meta">
@@ -969,8 +964,7 @@ export function initMarkcoAnnotations(getMarkdownValue) {
               </div>
             </div>
           </div>
-        `
-        }
+        </div>
       </div>
     `;
   }
@@ -1292,26 +1286,24 @@ export function initMarkcoAnnotations(getMarkdownValue) {
 
     let zoneCounter = 0;
     for (const [blockEl, group] of blockZoneMap.entries()) {
-      const hasVisibleComments = group.comments.some(
+      const visibleComments = group.comments.filter(
         item => !collapsedComments.has(item.comment.id)
       );
-      const isZoneVisible = hasVisibleComments || group.hasNewDraft;
+      const isZoneVisible = visibleComments.length > 0 || group.hasNewDraft;
+
+      if (!isZoneVisible) {
+        blockEl.removeAttribute('data-markco-zone');
+        continue;
+      }
 
       const zoneId = `markco-zone-${zoneCounter++}`;
-      if (isZoneVisible) {
-        blockEl.setAttribute('data-markco-zone', zoneId);
-      } else {
-        blockEl.removeAttribute('data-markco-zone');
-      }
+      blockEl.setAttribute('data-markco-zone', zoneId);
 
       const zoneEl = document.createElement('div');
       zoneEl.className = 'markco-inline-zone';
       zoneEl.setAttribute('data-zone-id', zoneId);
-      if (!isZoneVisible) {
-        zoneEl.style.display = 'none';
-      }
 
-      const threadsHtml = group.comments
+      const threadsHtml = visibleComments
         .map(item => renderThreadHtml(item.comment))
         .join('');
       const draftHtml = group.hasNewDraft
@@ -1331,8 +1323,8 @@ export function initMarkcoAnnotations(getMarkdownValue) {
         zoneId,
         blockEl,
         zoneEl,
-        anchorRange: group.comments[0]?.range || null,
-        isVisible: isZoneVisible
+        anchorRange: visibleComments[0]?.range || null,
+        isVisible: true
       });
     }
 
@@ -1601,42 +1593,48 @@ export function initMarkcoAnnotations(getMarkdownValue) {
   }
 
   function getInlineState() {
-    const threadEls = Array.from(
-      zonesLayer.querySelectorAll('.markco-inline-thread[data-comment-id]')
-    );
-    const threads = threadEls.map(el => {
+    const threadElsMap = new Map();
+    zonesLayer.querySelectorAll('.markco-inline-thread[data-comment-id]').forEach(el => {
       const cid = el.getAttribute('data-comment-id');
-      const zoneEl = el.closest('.markco-inline-zone');
+      if (cid) {
+        threadElsMap.set(cid, el);
+      }
+    });
+
+    const threads = activeComments.map(comment => {
+      const el = threadElsMap.get(comment.id);
+      const isCollapsed = collapsedComments.has(comment.id);
+      const isHidden =
+        isCollapsed ||
+        !el ||
+        el.offsetParent === null ||
+        window.getComputedStyle(el).display === 'none';
+      const zoneEl = el?.closest('.markco-inline-zone');
       const zoneId = zoneEl?.getAttribute('data-zone-id');
       const blockEl = zoneId
         ? document.querySelector(`[data-markco-zone="${CSS.escape(zoneId)}"]`)
         : null;
       const blockRect = blockEl ? blockEl.getBoundingClientRect() : null;
-      const threadRect = el.getBoundingClientRect();
-      const isCollapsed =
-        el.classList.contains('is-collapsed') ||
-        (cid ? collapsedComments.has(cid) : false);
-      const isHidden =
-        isCollapsed ||
-        el.offsetParent === null ||
-        window.getComputedStyle(el).display === 'none' ||
-        (zoneEl && zoneEl.style.display === 'none') ||
-        threadRect.height === 0;
+      const threadRect = el ? el.getBoundingClientRect() : null;
+
       return {
-        commentId: cid,
+        commentId: comment.id,
         isCollapsed,
         isHidden,
-        isResolved: el.classList.contains('is-resolved'),
-        text: el.textContent || '',
-        replyCount: el.querySelectorAll('.markco-inline-item--reply').length,
-        hasReplyBox: Boolean(el.querySelector('.markco-inline-reply-input')),
-        isBelowBlock: blockRect && !isHidden
-          ? threadRect.top >= blockRect.bottom - 2
-          : false
+        isResolved: Boolean(comment.resolved),
+        text: el ? (el.textContent || '') : (comment.content || ''),
+        replyCount: el
+          ? el.querySelectorAll('.markco-inline-item--reply').length
+          : (comment.replies || []).length,
+        hasReplyBox: el ? Boolean(el.querySelector('.markco-inline-reply-input')) : false,
+        isBelowBlock: Boolean(
+          blockRect && threadRect && !isHidden && threadRect.top >= blockRect.bottom - 2
+        )
       };
     });
+
     return {
-      zoneCount: activeZones.filter(z => z.zoneEl && z.zoneEl.style.display !== 'none').length,
+      zoneCount: activeZones.length,
       totalZoneCount: activeZones.length,
       threadCount: threads.length,
       visibleThreadCount: threads.filter(t => !t.isHidden).length,
