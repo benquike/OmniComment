@@ -17,7 +17,9 @@ suite('Extension Test Suite', () => {
 
   suite('Extension Activation', () => {
     test('Extension should be present', () => {
-      const extension = vscode.extensions.getExtension('OrenMaoz.markco');
+      const extension =
+        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.markco');
       // Extension may not be installed in test environment, just check API works
       assert.ok(true, 'Extension API is accessible');
     });
@@ -70,7 +72,9 @@ suite('Extension Test Suite', () => {
     });
 
     test('Package contribution contexts should include skill language', () => {
-      const extension = vscode.extensions.getExtension('OrenMaoz.markco');
+      const extension =
+        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.markco');
       const extensionPath = extension?.extensionPath ?? path.resolve(__dirname, '../../..');
       const packageJsonPath = path.join(extensionPath, 'package.json');
       assert.ok(fs.existsSync(packageJsonPath), `package.json not found at ${packageJsonPath}`);
@@ -338,7 +342,9 @@ suite('Extension Test Suite', () => {
 
   suite('OmniComment Branding & Agent API Contributions', () => {
     test('Package should contribute OmniComment branding, presets, and agent commands', () => {
-      const extension = vscode.extensions.getExtension('OrenMaoz.markco');
+      const extension =
+        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.markco');
       const extensionPath = extension?.extensionPath ?? path.resolve(__dirname, '../../..');
       const packageJsonPath = path.join(extensionPath, 'package.json');
       assert.ok(fs.existsSync(packageJsonPath), `package.json not found at ${packageJsonPath}`);

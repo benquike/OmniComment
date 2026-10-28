@@ -1,5 +1,5 @@
 /**
- * Markco Preview Styles
+ * OmniComment Preview Styles
  * 
  * Styles for commented text highlights in the Markdown preview.
  * These styles are injected into the VS Code Markdown preview via
@@ -7,9 +7,10 @@
  */
 
 /* Base highlight style for commented text */
+.omni-highlight,
 .markco-highlight {
-  background-color: rgba(255, 212, 0, 0.3);
-  border-bottom: 2px solid rgba(255, 212, 0, 0.8);
+  background-color: var(--omni-highlight-bg, rgba(255, 212, 0, 0.3));
+  border-bottom: 2px solid var(--omni-highlight-border, rgba(255, 212, 0, 0.8));
   border-radius: 2px;
   padding: 0 2px;
   cursor: default;
@@ -17,21 +18,27 @@
 }
 
 /* Hover effect */
+.omni-highlight:hover,
 .markco-highlight:hover {
-  background-color: rgba(255, 212, 0, 0.5);
+  background-color: var(--omni-highlight-hover, rgba(255, 212, 0, 0.5));
 }
 
 /* Resolved comments - more subtle styling */
+.omni-highlight.omni-resolved,
+.omni-highlight.markco-resolved,
 .markco-highlight.markco-resolved {
   background-color: rgba(128, 128, 128, 0.2);
   border-bottom-color: rgba(128, 128, 128, 0.5);
 }
 
+.omni-highlight.omni-resolved:hover,
+.omni-highlight.markco-resolved:hover,
 .markco-highlight.markco-resolved:hover {
   background-color: rgba(128, 128, 128, 0.3);
 }
 
-/* Comment indicator icon (optional - shows a small comment icon) */
+/* Comment indicator icon (shows small comment icon) */
+.omni-highlight::after,
 .markco-highlight::after {
   content: '💬';
   font-size: 0.7em;
@@ -40,22 +47,27 @@
   vertical-align: super;
 }
 
+.omni-highlight.omni-resolved::after,
+.omni-highlight.markco-resolved::after,
 .markco-highlight.markco-resolved::after {
   content: '✓';
   color: #6a9955;
 }
 
-/* Code block highlights - no emoji inside to avoid breaking formatting */
+/* Code block highlights */
+.omni-highlight-code,
 .markco-highlight-code {
   background-color: rgba(255, 212, 0, 0.3);
   border-radius: 2px;
 }
 
+.omni-highlight-code.omni-resolved,
 .markco-highlight-code.markco-resolved {
   background-color: rgba(128, 128, 128, 0.2);
 }
 
-/* Wrapper for commented code blocks - shows emoji at block level */
+/* Wrapper for commented code blocks */
+.omni-code-commented,
 .markco-code-commented {
   position: relative;
 }

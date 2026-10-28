@@ -6,9 +6,10 @@ import { CommentDecorator } from './decorators/CommentDecorator';
 import { CommentSidebarProvider } from './providers/CommentSidebarProvider';
 import {
   InlineCommentController,
+  OmniCommentInlineItem,
   MarkcoInlineCommentItem
 } from './providers/InlineCommentController';
-import { markcoPreviewPlugin } from './markdown/markcoPreviewPlugin';
+import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 
 let commentService: CommentService;
 let commentDecorator: CommentDecorator;
@@ -643,7 +644,7 @@ export function activate(context: vscode.ExtensionContext) {
             // Fallback to first non-empty line in the document if no target text was specified
             for (let i = 0; i < ctx.document.lineCount; i++) {
               const line = ctx.document.lineAt(i).text.trim();
-              if (line && !line.startsWith('<!-- markco-comments')) {
+              if (line && !line.startsWith('<!-- markco-comments') && !line.startsWith('<!-- omnicomment')) {
                 anchorText = line;
                 break;
               }
@@ -1110,11 +1111,11 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   // Return markdown-it plugin for preview highlighting
-  console.log('Markco: Returning extendMarkdownIt from activate()');
+  console.log('OmniComment: Returning extendMarkdownIt from activate()');
   return {
     extendMarkdownIt(md: any) {
-      console.log('Markco: extendMarkdownIt called!');
-      return md.use(markcoPreviewPlugin);
+      console.log('OmniComment: extendMarkdownIt called!');
+      return md.use(omniCommentPreviewPlugin);
     }
   };
 }

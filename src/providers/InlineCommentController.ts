@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Comment, Reply } from '../types';
 
-export class MarkcoInlineCommentItem implements vscode.Comment {
+export class OmniCommentInlineItem implements vscode.Comment {
   public body: vscode.MarkdownString;
   public mode: vscode.CommentMode = vscode.CommentMode.Preview;
   public author: vscode.CommentAuthorInformation;
@@ -32,6 +32,8 @@ export class MarkcoInlineCommentItem implements vscode.Comment {
     this.contextValue = replyId ? 'markcoReply' : 'markcoComment';
   }
 }
+
+export class MarkcoInlineCommentItem extends OmniCommentInlineItem {}
 
 export class InlineCommentController implements vscode.Disposable {
   private readonly _controller: vscode.CommentController;
