@@ -13,7 +13,7 @@
     "url": "https://github.com/babonet/Markco/issues"
   },
   "homepage": "https://github.com/babonet/Markco#readme",
-  "icon": "media/markco.png",
+  "icon": "media/omnicomment.png",
   "engines": {
     "vscode": "^1.85.0"
   },
