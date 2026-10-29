@@ -19,7 +19,15 @@ export class CommentService {
   /**
    * Get the Git username from git config, with fallback to 'user'
    */
+  // Invariant: Return explicitly configured defaultAuthor, falling back to git user.name or 'user'.
+  // Why: Allows users to configure their author identity directly in comment box settings.
+  // Example: omnicomment.commentBox.defaultAuthor = 'Alice' -> returns 'Alice'.
   public async getGitUserName(document: vscode.TextDocument): Promise<string> {
+    const omniConfig = vscode.workspace.getConfiguration('omnicomment');
+    const configuredAuthor = omniConfig.get<string>('commentBox.defaultAuthor')?.trim();
+    if (configuredAuthor) {
+      return configuredAuthor;
+    }
     try {
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
       const cwd = workspaceFolder?.uri.fsPath ?? require('path').dirname(document.uri.fsPath);

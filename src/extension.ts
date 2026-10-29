@@ -11,6 +11,12 @@ import {
 } from './providers/InlineCommentController';
 import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
+import {
+  CommentBoxConfig,
+  CommentBoxWidthMode,
+  DEFAULT_COMMENT_BOX_CONFIG,
+  resolveCommentBoxDimensions
+} from './core/types';
 
 let commentService: CommentService;
 let commentDecorator: CommentDecorator;
@@ -87,13 +93,21 @@ function syncMarkdownEditorIntegration(extPath: string): void {
     const officeOutExt = path.join(officeExtPath, 'out', 'extension.js');
     if (fs.existsSync(officeOutExt)) {
       let content = fs.readFileSync(officeOutExt, 'utf8');
-      if (!content.includes('office.markdown.openAddCommentInEditor')) {
-        const hook = 'function zS(t,e){for(let r of yP.values())r.emit(t,e)}';
-        const injection =
-          'function zS(t,e){for(let r of yP.values())r.emit(t,e)}var xP=mt(require("vscode"));try{xP.commands.registerCommand("office.markdown.focusOmniComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.focusMarkcoComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.openAddCommentInEditor",t=>{zS("openAddCommentInEditor",{selectedText:t})});xP.commands.registerCommand("office.markdown.queryOmniInlineState",t=>{zS("queryOmniInlineState",t||{})});xP.commands.registerCommand("office.markdown.queryMarkcoInlineState",t=>{zS("queryOmniInlineState",t||{})})}catch{}';
-        if (content.includes(hook)) {
-          content = content.replace(hook, injection);
+      if (!content.includes('office.markdown.updateOmniCommentConfig')) {
+        if (content.includes('office.markdown.openAddCommentInEditor')) {
+          content = content.replace(
+            'office.markdown.openAddCommentInEditor",t=>{zS("openAddCommentInEditor",{selectedText:t})});',
+            'office.markdown.openAddCommentInEditor",t=>{zS("openAddCommentInEditor",{selectedText:t})});xP.commands.registerCommand("office.markdown.updateOmniCommentConfig",t=>{zS("updateOmniCommentConfig",t||{})});'
+          );
           fs.writeFileSync(officeOutExt, content, 'utf8');
+        } else {
+          const hook = 'function zS(t,e){for(let r of yP.values())r.emit(t,e)}';
+          const injection =
+            'function zS(t,e){for(let r of yP.values())r.emit(t,e)}var xP=mt(require("vscode"));try{xP.commands.registerCommand("office.markdown.focusOmniComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.focusMarkcoComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.openAddCommentInEditor",t=>{zS("openAddCommentInEditor",{selectedText:t})});xP.commands.registerCommand("office.markdown.queryOmniInlineState",t=>{zS("queryOmniInlineState",t||{})});xP.commands.registerCommand("office.markdown.queryMarkcoInlineState",t=>{zS("queryOmniInlineState",t||{})});xP.commands.registerCommand("office.markdown.updateOmniCommentConfig",t=>{zS("updateOmniCommentConfig",t||{})})}catch{}';
+          if (content.includes(hook)) {
+            content = content.replace(hook, injection);
+            fs.writeFileSync(officeOutExt, content, 'utf8');
+          }
         }
       }
     }
@@ -1122,14 +1136,27 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage(`OmniComment preset applied: ${selectedPreset}`);
   };
 
-  // Register Agent APIs under omnicomment.agent.*
+  // Register Agent APIs under omnicomment.agent.* and configuration commands
   context.subscriptions.push(
     vscode.commands.registerCommand('omnicomment.agent.getComments', agentGetCommentsHandler),
     vscode.commands.registerCommand('omnicomment.agent.postComment', agentPostCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.replyComment', agentReplyCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.resolveComment', agentResolveCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.deleteComment', agentDeleteCommentHandler),
-    vscode.commands.registerCommand('omnicomment.applyPreset', applyPresetHandler)
+    vscode.commands.registerCommand('omnicomment.applyPreset', applyPresetHandler),
+    vscode.commands.registerCommand('omnicomment.configureCommentBox', configureCommentBoxHandler),
+    vscode.commands.registerCommand('omnicomment.saveCommentBoxConfig', saveCommentBoxConfigHandler)
+  );
+
+  // Invariant: Listen for OmniComment configuration updates and broadcast to all active providers.
+  // Why: Guarantees that adjustments made in settings.json or Settings UI take effect immediately.
+  // Example: toggling omnicomment.commentBox.enableMarkdown updates open threads and webview cards.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async event => {
+      if (event.affectsConfiguration('omnicomment.commentBox')) {
+        await broadcastCommentBoxConfig();
+      }
+    })
   );
 
   // Register backward compatibility aliases for OmniComment.* and OminiComment.*
@@ -1367,6 +1394,225 @@ export function resolveAnchorSelectionForThread(
   }
 
   return new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
+}
+
+// Invariant: Reads comment box configuration parameters from workspace settings.
+// Why: Provides unified configuration state for all editor modes (Markdown view, plain text, and sidebar).
+// Example: getCommentBoxConfig() returns { widthMode: 'standard', minWidth: 320, maxWidth: 460, ... }
+export function getCommentBoxConfig(): CommentBoxConfig {
+  const config = vscode.workspace.getConfiguration('omnicomment');
+  return {
+    widthMode: config.get<CommentBoxWidthMode>('commentBox.widthMode', 'standard'),
+    minWidth: config.get<number>('commentBox.minWidth', 320),
+    maxWidth: config.get<number>('commentBox.maxWidth', 460),
+    fontSize: config.get<number>('commentBox.fontSize', 12),
+    enableMarkdown: config.get<boolean>('commentBox.enableMarkdown', true),
+    showAvatars: config.get<boolean>('commentBox.showAvatars', true),
+    showThreadGuide: config.get<boolean>('commentBox.showThreadGuide', true),
+    defaultAuthor: config.get<string>('commentBox.defaultAuthor', '')
+  };
+}
+
+// Invariant: Broadcasts comment box configuration changes to sidebar, inline controllers, and webviews.
+// Why: Ensures all open comment cards across editors reflect user adjustments immediately without reload.
+// Example: broadcastCommentBoxConfig() updates sidebar webview, inline comments, and Markdown Editor.
+export async function broadcastCommentBoxConfig(customConfig?: CommentBoxConfig): Promise<void> {
+  const cfg = customConfig || getCommentBoxConfig();
+  if (sidebarProvider) {
+    sidebarProvider.updateCommentBoxConfig(cfg);
+  }
+  if (inlineCommentController) {
+    inlineCommentController.updateConfiguration();
+  }
+  try {
+    await vscode.commands.executeCommand('office.markdown.updateOmniCommentConfig', cfg);
+  } catch {
+    // Office extension may not be active; ignore
+  }
+}
+
+// Invariant: Prompts the user with density presets or custom pixel dimensions for comment box width.
+// Why: Enables easy switching between compact, standard, wide, and custom box sizes.
+// Example: user picks 'Compact' -> updates omnicomment.commentBox.widthMode to 'compact'.
+async function configureWidthSetting(config: vscode.WorkspaceConfiguration, current: CommentBoxConfig): Promise<void> {
+  const modePick = await vscode.window.showQuickPick([
+    { label: 'Compact', description: '280px min, 360px max — ultra-compact footprint for narrow screens', mode: 'compact' },
+    { label: 'Standard', description: '320px min, 460px max — balanced ergonomic layout (Recommended)', mode: 'standard' },
+    { label: 'Wide', description: '420px min, 640px max — spacious card for large code blocks & discussions', mode: 'wide' },
+    { label: 'Custom...', description: 'Specify exact minWidth and maxWidth in pixels', mode: 'custom' }
+  ], { placeHolder: 'Select width density preset:' });
+  if (!modePick) return;
+
+  if (modePick.mode !== 'custom') {
+    await config.update('commentBox.widthMode', modePick.mode, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Comment box width mode set to: ${modePick.label}`);
+    return;
+  }
+
+  const minStr = await vscode.window.showInputBox({
+    prompt: 'Enter minimum width in pixels (e.g. 350):',
+    value: String(current.minWidth)
+  });
+  if (!minStr) return;
+  const maxStr = await vscode.window.showInputBox({
+    prompt: 'Enter maximum width in pixels (e.g. 550):',
+    value: String(current.maxWidth)
+  });
+  if (!maxStr) return;
+  const minW = parseInt(minStr, 10);
+  const maxW = parseInt(maxStr, 10);
+  if (!isNaN(minW) && !isNaN(maxW)) {
+    await config.update('commentBox.widthMode', 'custom', vscode.ConfigurationTarget.Global);
+    await config.update('commentBox.minWidth', minW, vscode.ConfigurationTarget.Global);
+    await config.update('commentBox.maxWidth', maxW, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Comment box width set to custom: ${minW}px - ${maxW}px`);
+  }
+}
+
+// Invariant: Prompts the user to pick a text font size for the comment cards.
+// Why: Lets users tune readability according to screen scaling and personal preference.
+// Example: user picks '11px' -> updates omnicomment.commentBox.fontSize to 11.
+async function configureFontSizeSetting(config: vscode.WorkspaceConfiguration): Promise<void> {
+  const sizePick = await vscode.window.showQuickPick([
+    { label: '11px', description: 'Compact text', size: 11 },
+    { label: '12px', description: 'Standard text (Default)', size: 12 },
+    { label: '13px', description: 'Medium text', size: 13 },
+    { label: '14px', description: 'Large text', size: 14 },
+    { label: '16px', description: 'Extra large text', size: 16 }
+  ], { placeHolder: 'Select comment text font size:' });
+  if (!sizePick) return;
+  await config.update('commentBox.fontSize', sizePick.size, vscode.ConfigurationTarget.Global);
+  vscode.window.showInformationMessage(`Comment box font size set to: ${sizePick.label}`);
+}
+
+// Invariant: Prompts the user for a preferred default author name.
+// Why: Customizes author identity attached to new comments without modifying git globals.
+// Example: user enters 'Alice' -> updates omnicomment.commentBox.defaultAuthor to 'Alice'.
+async function configureAuthorSetting(config: vscode.WorkspaceConfiguration, current: CommentBoxConfig): Promise<void> {
+  const authorInput = await vscode.window.showInputBox({
+    prompt: 'Enter your preferred default author name (leave blank to use Git/System username):',
+    value: current.defaultAuthor
+  });
+  if (authorInput !== undefined) {
+    await config.update('commentBox.defaultAuthor', authorInput.trim(), vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Default author set to: ${authorInput.trim() || '(Git / System user)'}`);
+  }
+}
+
+// Invariant: Presents an interactive QuickPick allowing users to configure comment box dimensions, typography, and features.
+// Why: Gives users a direct, frictionless way to configure the comment box without manual JSON editing.
+// Example: user selects "Width / Density" to configure card size.
+export async function configureCommentBoxHandler(): Promise<void> {
+  const current = getCommentBoxConfig();
+  const dims = resolveCommentBoxDimensions(current);
+
+  const options: (vscode.QuickPickItem & { action: string })[] = [
+    {
+      label: `$(symbol-ruler) Width / Density: ${current.widthMode.toUpperCase()}`,
+      description: `Min ${dims.minWidth}px, Max ${dims.maxWidth}px`,
+      detail: 'Switch between Compact (280-360px), Standard (320-460px), Wide (420-640px), or Custom width',
+      action: 'width'
+    },
+    {
+      label: `$(text-size) Font Size: ${dims.fontSize}px`,
+      description: `Current: ${dims.fontSize}px`,
+      detail: 'Adjust base text size for comment body and replies',
+      action: 'fontSize'
+    },
+    {
+      label: `$(markdown) Markdown Formatting: ${current.enableMarkdown ? 'Enabled' : 'Disabled'}`,
+      description: current.enableMarkdown ? 'Formatting bold, code, quotes, lists' : 'Rendering plain text',
+      detail: 'Toggle rich Markdown rendering inside comment cards',
+      action: 'markdown'
+    },
+    {
+      label: `$(account) Author Avatars: ${current.showAvatars ? 'Shown' : 'Hidden'}`,
+      description: current.showAvatars ? 'Author initial circles visible' : 'Hidden',
+      detail: 'Toggle author initial circle badges in headers and replies',
+      action: 'avatars'
+    },
+    {
+      label: `$(list-tree) Thread Connector Guide: ${current.showThreadGuide ? 'Shown' : 'Hidden'}`,
+      description: current.showThreadGuide ? 'Vertical connector line visible' : 'Hidden',
+      detail: 'Toggle vertical connector indent guide for discussion replies',
+      action: 'threadGuide'
+    },
+    {
+      label: `$(person) Default Author Name: ${current.defaultAuthor ? current.defaultAuthor : '(Git / OS username)'}`,
+      description: 'Display name attached to your comments and replies',
+      detail: 'Customize default author identity',
+      action: 'author'
+    },
+    {
+      label: '$(gear) Open Full Settings in VS Code',
+      description: 'Open OmniComment section in Settings Editor',
+      detail: 'View and adjust all OmniComment configuration options',
+      action: 'settings'
+    }
+  ];
+
+  const picked = await vscode.window.showQuickPick(options, {
+    placeHolder: 'Select a Comment Box option to configure:'
+  });
+
+  if (!picked) return;
+
+  const config = vscode.workspace.getConfiguration('omnicomment');
+  if (picked.action === 'width') {
+    await configureWidthSetting(config, current);
+  } else if (picked.action === 'fontSize') {
+    await configureFontSizeSetting(config);
+  } else if (picked.action === 'markdown') {
+    const nextVal = !current.enableMarkdown;
+    await config.update('commentBox.enableMarkdown', nextVal, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Comment Markdown formatting: ${nextVal ? 'Enabled' : 'Disabled'}`);
+  } else if (picked.action === 'avatars') {
+    const nextVal = !current.showAvatars;
+    await config.update('commentBox.showAvatars', nextVal, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Comment author avatars: ${nextVal ? 'Shown' : 'Hidden'}`);
+  } else if (picked.action === 'threadGuide') {
+    const nextVal = !current.showThreadGuide;
+    await config.update('commentBox.showThreadGuide', nextVal, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Thread connector guide: ${nextVal ? 'Shown' : 'Hidden'}`);
+  } else if (picked.action === 'author') {
+    await configureAuthorSetting(config, current);
+  } else if (picked.action === 'settings') {
+    await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:benquike.omnicomment');
+  }
+}
+
+// Invariant: Saves comment box configuration parameters submitted from the webview into VS Code settings.
+// Why: Synchronizes changes made via the in-editor gear popover with persistent workspace configuration.
+// Example: saveCommentBoxConfigHandler({ widthMode: 'compact' }) updates omnicomment.commentBox.widthMode.
+export async function saveCommentBoxConfigHandler(newConfig: Partial<CommentBoxConfig>): Promise<void> {
+  if (!newConfig || typeof newConfig !== 'object') {
+    return;
+  }
+  const config = vscode.workspace.getConfiguration('omnicomment');
+  if (newConfig.widthMode !== undefined) {
+    await config.update('commentBox.widthMode', newConfig.widthMode, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.minWidth !== undefined) {
+    await config.update('commentBox.minWidth', newConfig.minWidth, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.maxWidth !== undefined) {
+    await config.update('commentBox.maxWidth', newConfig.maxWidth, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.fontSize !== undefined) {
+    await config.update('commentBox.fontSize', newConfig.fontSize, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.enableMarkdown !== undefined) {
+    await config.update('commentBox.enableMarkdown', newConfig.enableMarkdown, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.showAvatars !== undefined) {
+    await config.update('commentBox.showAvatars', newConfig.showAvatars, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.showThreadGuide !== undefined) {
+    await config.update('commentBox.showThreadGuide', newConfig.showThreadGuide, vscode.ConfigurationTarget.Global);
+  }
+  if (newConfig.defaultAuthor !== undefined) {
+    await config.update('commentBox.defaultAuthor', newConfig.defaultAuthor, vscode.ConfigurationTarget.Global);
+  }
 }
 
 // Invariant: Prompts user for comment text in standard TextEditor mode using VS Code input box.

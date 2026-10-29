@@ -153,6 +153,29 @@ kbd {
   font-size: 11px;
 }
 
+.comment-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--vscode-badge-background, #3a3d41);
+  color: var(--vscode-badge-foreground, #ffffff);
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.comment-avatar.is-reply {
+  width: 15px;
+  height: 15px;
+  font-size: 8.5px;
+  margin-right: 4px;
+}
+
 .comment-author {
   font-weight: 600;
   color: var(--vscode-textLink-foreground);
@@ -169,6 +192,51 @@ kbd {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.omni-comment-inline-code {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.9em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(127, 127, 127, 0.2);
+  color: var(--vscode-textPreformat-foreground, #f0883e);
+}
+
+.omni-comment-code-block {
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11.5px;
+  line-height: 1.35;
+  overflow-x: auto;
+}
+
+.omni-comment-quote {
+  margin: 6px 0;
+  padding: 2px 8px;
+  border-left: 3px solid var(--vscode-textBlockQuote-border, #007acc);
+  background: rgba(127, 127, 127, 0.08);
+  border-radius: 0 3px 3px 0;
+  opacity: 0.92;
+}
+
+.omni-comment-list {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.omni-comment-list-item,
+.omni-comment-num-item {
+  margin-bottom: 2px;
+}
+
+.omni-comment-link {
+  color: var(--vscode-textLink-foreground, #58a6ff);
+  text-decoration: underline;
 }
 
 .comment-anchor-box {

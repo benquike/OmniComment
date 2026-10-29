@@ -25,7 +25,17 @@ export class OmniCommentInlineItem implements vscode.Comment {
       const escapedQuote = anchorText.replace(/\r?\n/g, ' ');
       md.appendMarkdown(`> **${lineLabel || 'Target'}:** \`${escapedQuote}\`\n\n`);
     }
-    md.appendText(rawContent);
+    // Invariant: Render comment content with rich markdown when enableMarkdown is true, or plain text when false.
+    // Why: Allows users to configure whether inline comment boxes format markdown or preserve raw text.
+    // Example: rawContent "**bold**" renders as bold text when enabled or as literal "**bold**" when disabled.
+    const enableMarkdown = vscode.workspace
+      .getConfiguration('omnicomment')
+      .get<boolean>('commentBox.enableMarkdown', true);
+    if (enableMarkdown) {
+      md.appendMarkdown(rawContent);
+    } else {
+      md.appendText(rawContent);
+    }
     this.body = md;
     this.author = { name: authorName };
     const dateStr = InlineCommentController.formatShortDate(createdAt);
@@ -39,6 +49,7 @@ export class InlineCommentController implements vscode.Disposable {
   private readonly _threadsByDoc = new Map<string, Map<string, vscode.CommentThread>>();
   private readonly _commentIdByThread = new WeakMap<vscode.CommentThread, string>();
   private readonly _collapsedByUser = new Map<string, vscode.CommentThreadCollapsibleState>();
+  private readonly _lastDocComments = new Map<string, { doc: vscode.TextDocument; comments: Comment[] }>();
   private _allCollapsed = false;
 
   constructor() {
@@ -110,6 +121,7 @@ export class InlineCommentController implements vscode.Disposable {
 
   public syncDocumentComments(document: vscode.TextDocument, comments: Comment[]): void {
     const docKey = document.uri.toString();
+    this._lastDocComments.set(docKey, { doc: document, comments });
     let docThreads = this._threadsByDoc.get(docKey);
     if (!docThreads) {
       docThreads = new Map<string, vscode.CommentThread>();
@@ -256,6 +268,15 @@ export class InlineCommentController implements vscode.Disposable {
 
   public getThreadCount(documentUri: vscode.Uri): number {
     return this._threadsByDoc.get(documentUri.toString())?.size ?? 0;
+  }
+
+  // Invariant: Re-renders all active comment threads to reflect updated configuration settings.
+  // Why: Instantly updates markdown rendering, author labels, and placeholders when user changes settings.
+  // Example: toggling enableMarkdown immediately re-renders comment bodies across open editors.
+  public updateConfiguration(): void {
+    for (const { doc, comments } of this._lastDocComments.values()) {
+      this.syncDocumentComments(doc, comments);
+    }
   }
 
   public dispose(): void {

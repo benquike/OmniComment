@@ -95,6 +95,9 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
             this._onResolve(message.commentId);
           }
           break;
+        case 'configureCommentBox':
+          vscode.commands.executeCommand('omnicomment.configureCommentBox');
+          break;
         case 'ready':
           this._isReady = true;
           // Webview is ready, request current comments from extension
@@ -194,6 +197,18 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       } as SidebarMessage);
     } else {
       this._pendingFocusCommentId = commentId;
+    }
+  }
+
+  // Invariant: Sends comment box configuration parameters to the active sidebar webview.
+  // Why: Synchronizes markdown formatting, avatar visibility, and typography in the comments sidebar.
+  // Example: updateCommentBoxConfig({ enableMarkdown: false }) re-renders sidebar comments as plain text.
+  public updateCommentBoxConfig(config: import('../core/commentBoxConfig').CommentBoxConfig): void {
+    if (this._view && this._isReady) {
+      this._view.webview.postMessage({
+        type: 'setCommentBoxConfig',
+        config
+      });
     }
   }
 
@@ -302,6 +317,9 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
         <button id="toggle-resolved" class="btn-toggle" title="Toggle resolved comments">
           <i class="codicon codicon-eye"></i>
         </button>
+        <button id="configure-box-btn" class="btn-toggle" title="Configure Comment Box">
+          <i class="codicon codicon-settings-gear"></i>
+        </button>
       </div>
     </div>
     
@@ -344,6 +362,16 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     let replyingToCommentId = null;
     let showResolved = true;
     let currentUser = null;
+    let commentBoxConfig = {
+      enableMarkdown: true,
+      showAvatars: true
+    };
+
+    function getAuthorInitial(author) {
+      if (!author || typeof author !== 'string') return 'U';
+      var trimmed = author.trim();
+      return trimmed ? trimmed[0].toUpperCase() : 'U';
+    }
 
     function toggleResolved() {
       showResolved = !showResolved;
@@ -431,7 +459,10 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       container.innerHTML = filteredComments.map(comment => \`
         <div class="comment-item \${comment.resolved ? 'resolved' : ''} \${comment.orphaned ? 'orphaned' : ''}" data-id="\${comment.id}" onclick="navigateToComment('\${comment.id}')">
           <div class="comment-header">
-            <span class="comment-author">\${escapeHtml(comment.author)}</span>
+            <span class="comment-header-left" style="display:inline-flex;align-items:center;">
+              \${commentBoxConfig.showAvatars ? \`<span class="comment-avatar">\${escapeHtml(getAuthorInitial(comment.author))}</span>\` : ''}
+              <span class="comment-author">\${escapeHtml(comment.author)}</span>
+            </span>
             <span class="comment-date">\${formatDate(comment.createdAt)}</span>
           </div>
           \${comment.orphaned ? \`
@@ -450,7 +481,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
             <div class="comment-anchor">\${escapeHtml(comment.anchor.text)}</div>
           </div>
           \${editingCommentId === comment.id ? renderEditCommentForm(comment) : \`
-            <div class="comment-content">\${escapeHtml(comment.content)}</div>
+            <div class="comment-content">\${renderCommentMarkdown(comment.content)}</div>
           \`}
           \${editingCommentId !== comment.id ? \`
             <div class="comment-actions">
@@ -615,11 +646,14 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
           \${comment.replies.map(reply => \`
             <div class="reply-item" data-reply-id="\${reply.id}">
               <div class="reply-header">
-                <span class="reply-author">\${escapeHtml(reply.author)}</span>
+                <span class="reply-header-left" style="display:inline-flex;align-items:center;">
+                  \${commentBoxConfig.showAvatars ? \`<span class="comment-avatar is-reply">\${escapeHtml(getAuthorInitial(reply.author))}</span>\` : ''}
+                  <span class="reply-author">\${escapeHtml(reply.author)}</span>
+                </span>
                 <span class="reply-date">\${formatDate(reply.createdAt)}</span>
               </div>
               \${editingReplyId && editingReplyId.replyId === reply.id ? renderEditReplyForm(comment.id, reply) : \`
-                <div class="reply-content">\${escapeHtml(reply.content)}</div>
+                <div class="reply-content">\${renderCommentMarkdown(reply.content)}</div>
                 <div class="reply-actions">
                   \${currentUser && reply.author === currentUser ? \`<button class="btn-icon btn-edit-reply" onclick="startEditReply('\${comment.id}', '\${reply.id}')" title="Edit"><i class="codicon codicon-edit"></i></button>\` : ''}
                   <button class="btn-icon btn-thumbsup \${reply.thumbsUp && reply.thumbsUp.includes(currentUser) ? 'active' : ''}" onclick="toggleThumbsUpReply('\${comment.id}', '\${reply.id}')" title="\${reply.thumbsUp && reply.thumbsUp.length ? reply.thumbsUp.join(', ') : 'No reactions'}"><i class="codicon codicon-thumbsup"></i>\${reply.thumbsUp && reply.thumbsUp.length > 1 ? \`<span class="thumbsup-count">\${reply.thumbsUp.length}</span>\` : ''}</button>
@@ -647,6 +681,52 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function renderCommentMarkdown(text) {
+      if (!text || typeof text !== 'string') return '';
+      if (commentBoxConfig && !commentBoxConfig.enableMarkdown) {
+        return escapeHtml(text).replace(/\n/g, '<br>');
+      }
+      var escaped = escapeHtml(text);
+      var codeBlocks = [];
+      var tick = String.fromCharCode(96);
+      var tripleTick = tick + tick + tick;
+      escaped = escaped.split(tripleTick).map(function(part, i) {
+        if (i % 2 === 1) {
+          var idx = codeBlocks.length;
+          var newlineIdx = part.indexOf('\\n');
+          var code = newlineIdx !== -1 ? part.substring(newlineIdx + 1) : part;
+          codeBlocks.push('<pre class="omni-comment-code-block"><code>' + code.trim() + '</code></pre>');
+          return '%%CODEBLOCK_' + idx + '%%';
+        }
+        return part;
+      }).join('');
+      escaped = escaped.split(tick).map(function(part, i) {
+        if (i % 2 === 1) {
+          return '<code class="omni-comment-inline-code">' + part + '</code>';
+        }
+        return part;
+      }).join('');
+      escaped = escaped.replace(/^(?:&gt;|>)[ \\t]?(.*)$/gm, '<blockquote class="omni-comment-quote">$1</blockquote>');
+      escaped = escaped.replace(/(\\*{3}|_{3})(?=\\S)([\\s\\S]*?\\S)\\1/g, '<strong><em>$2</em></strong>');
+      escaped = escaped.replace(/(\\*{2}|_{2})(?=\\S)([\\s\\S]*?\\S)\\1/g, '<strong>$2</strong>');
+      escaped = escaped.replace(/(^|[^\\*])\\*([^\\*\\s][^\\*]*?[^\\*\\s]|\\S)\\*([^\\*]|$)/g, '$1<em>$2</em>$3');
+      escaped = escaped.replace(/(^|[^_])_([^_ \\t\\n][^_]*?[^_ \\t\\n]|\\S)_([^_]|$)/g, '$1<em>$2</em>$3');
+      escaped = escaped.replace(/~~(?=\\S)([\\s\\S]*?\\S)~~/g, '<del>$1</del>');
+      escaped = escaped.replace(/\\[([^\\]]+)\\]\\(((?:https?:\\/\\/|\\/|mailto:)[^\\s\\)]+)\\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="omni-comment-link">$1</a>');
+      escaped = escaped.replace(/^[ \\t]*[\\-\\*][ \\t]+(.+)$/gm, '<li class="omni-comment-list-item">$1</li>');
+      escaped = escaped.replace(/((?:<li class="omni-comment-list-item">.*<\\/li>\\s*)+)/g, '<ul class="omni-comment-list">$1</ul>');
+      escaped = escaped.replace(/^[ \\t]*\\d+\\.[ \\t]+(.+)$/gm, '<li class="omni-comment-num-item">$1</li>');
+      escaped = escaped.replace(/((?:<li class="omni-comment-num-item">.*<\\/li>\\s*)+)/g, '<ol class="omni-comment-list">$1</ol>');
+      escaped = escaped.replace(/\\n/g, '<br>');
+      escaped = escaped.replace(/(?:<br>\\s*)+<(ul|ol|blockquote)/g, '<$1');
+      escaped = escaped.replace(/<\\/(ul|ol|blockquote)>(?:\\s*<br>)+/g, '</$1>');
+      escaped = escaped.replace(/<\\/li>(?:\\s*<br>\\s*)+<li/g, '</li><li');
+      escaped = escaped.replace(/%%CODEBLOCK_(\\d+)%%/g, function(match, idx) {
+        return codeBlocks[Number(idx)] || '';
+      });
+      return escaped;
     }
 
     function truncate(text, length) {
@@ -743,6 +823,12 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
           submitNewComment();
           break;
         }
+        case 'setCommentBoxConfig':
+          if (message.config) {
+            commentBoxConfig = Object.assign({}, commentBoxConfig, message.config);
+            renderComments();
+          }
+          break;
       }
     });
 
@@ -751,6 +837,14 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     
     // Setup toggle button
     document.getElementById('toggle-resolved').addEventListener('click', toggleResolved);
+
+    // Setup configure box button
+    const configureBoxBtn = document.getElementById('configure-box-btn');
+    if (configureBoxBtn) {
+      configureBoxBtn.addEventListener('click', function() {
+        vscode.postMessage({ type: 'configureCommentBox' });
+      });
+    }
     
     // Setup add comment button
     document.getElementById('add-comment-btn').addEventListener('click', function() {

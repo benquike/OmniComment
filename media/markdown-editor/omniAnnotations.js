@@ -488,6 +488,44 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function getAuthorInitial(author) {
+  if (!author || typeof author !== 'string') return 'U';
+  const trimmed = author.trim();
+  return trimmed ? trimmed[0].toUpperCase() : 'U';
+}
+
+// Invariant: Converts comment raw text containing Markdown syntax into sanitized, structured HTML elements.
+// Why: Enables rich technical formatting (bold, code, lists, quotes, links) in inline comments without XSS vulnerability.
+// Example: "**bold** and `code`" -> "<strong>bold</strong> and <code class='omni-comment-inline-code'>code</code>"
+function renderCommentMarkdown(text) {
+  if (!text || typeof text !== 'string') return '';
+  let escaped = escapeHtml(text);
+  const codeBlocks = [];
+  escaped = escaped.replace(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g, (match, lang, code) => {
+    const idx = codeBlocks.length;
+    codeBlocks.push(`<pre class="omni-comment-code-block"><code>${code.trim()}</code></pre>`);
+    return `%%CODEBLOCK_${idx}%%`;
+  });
+  escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="omni-comment-inline-code">$1</code>');
+  escaped = escaped.replace(/^(?:&gt;|>)[ \t]?(.*)$/gm, '<blockquote class="omni-comment-quote">$1</blockquote>');
+  escaped = escaped.replace(/(\*{3}|_{3})(?=\S)([\s\S]*?\S)\1/g, '<strong><em>$2</em></strong>');
+  escaped = escaped.replace(/(\*{2}|_{2})(?=\S)([\s\S]*?\S)\1/g, '<strong>$2</strong>');
+  escaped = escaped.replace(/(^|[^\*])\*([^\*\s][^\*]*?[^\*\s]|\S)\*([^\*]|$)/g, '$1<em>$2</em>$3');
+  escaped = escaped.replace(/(^|[^_])_([^_ \t\n][^_]*?[^_ \t\n]|\S)_([^_]|$)/g, '$1<em>$2</em>$3');
+  escaped = escaped.replace(/~~(?=\S)([\s\S]*?\S)~~/g, '<del>$1</del>');
+  escaped = escaped.replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/|mailto:)[^\s\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="omni-comment-link">$1</a>');
+  escaped = escaped.replace(/^[ \t]*[\-\*][ \t]+(.+)$/gm, '<li class="omni-comment-list-item">$1</li>');
+  escaped = escaped.replace(/((?:<li class="omni-comment-list-item">.*<\/li>\s*)+)/g, '<ul class="omni-comment-list">$1</ul>');
+  escaped = escaped.replace(/^[ \t]*\d+\.[ \t]+(.+)$/gm, '<li class="omni-comment-num-item">$1</li>');
+  escaped = escaped.replace(/((?:<li class="omni-comment-num-item">.*<\/li>\s*)+)/g, '<ol class="omni-comment-list">$1</ol>');
+  escaped = escaped.replace(/\n/g, '<br>');
+  escaped = escaped.replace(/(?:<br>\s*)+<(ul|ol|blockquote)/g, '<$1');
+  escaped = escaped.replace(/<\/(ul|ol|blockquote)>(?:\s*<br>)+/g, '</$1>');
+  escaped = escaped.replace(/<\/li>(?:\s*<br>\s*)+<li/g, '</li><li');
+  escaped = escaped.replace(/%%CODEBLOCK_(\d+)%%/g, (match, idx) => codeBlocks[Number(idx)] || '');
+  return escaped;
+}
+
 function formatLineLabel(anchor) {
   if (!anchor || typeof anchor.startLine !== 'number') return 'Comment';
   const start = anchor.startLine + 1;
@@ -558,6 +596,75 @@ export function initOmniAnnotations(getMarkdownValue) {
   let activeEditCommentId = null;
   let activeReplyCommentId = null;
   let activeBlockCounts = new Map(); // blockEl -> number of active comments on this block
+
+  // Configurable comment box state
+  let commentBoxConfig = {
+    widthMode: 'standard',
+    minWidth: 320,
+    maxWidth: 460,
+    fontSize: 12,
+    enableMarkdown: true,
+    showAvatars: true,
+    showThreadGuide: true,
+    defaultAuthor: ''
+  };
+
+  try {
+    const storedConfig = localStorage.getItem('omnicomment.commentBoxConfig');
+    if (storedConfig) {
+      commentBoxConfig = { ...commentBoxConfig, ...JSON.parse(storedConfig) };
+    }
+  } catch {}
+
+  let activeConfigPopoverZoneId = null;
+
+  // Invariant: Resolves pixel boundaries and font size from current commentBoxConfig.
+  // Why: Provides dynamic layout calculation for compact, standard, wide, and custom densities.
+  // Example: resolveEffectiveDimensions() returns { minWidth: 280, maxWidth: 360, fontSize: 11 } for compact.
+  function resolveEffectiveDimensions() {
+    const mode = commentBoxConfig.widthMode || 'standard';
+    if (mode === 'compact') {
+      return {
+        minWidth: 280,
+        maxWidth: 360,
+        fontSize: commentBoxConfig.fontSize || 11
+      };
+    }
+    if (mode === 'wide') {
+      return {
+        minWidth: 420,
+        maxWidth: 640,
+        fontSize: commentBoxConfig.fontSize || 13
+      };
+    }
+    if (mode === 'custom') {
+      const minW = Math.max(160, commentBoxConfig.minWidth || 320);
+      const maxW = Math.max(minW, commentBoxConfig.maxWidth || 460);
+      return {
+        minWidth: minW,
+        maxWidth: maxW,
+        fontSize: commentBoxConfig.fontSize || 12
+      };
+    }
+    return {
+      minWidth: 320,
+      maxWidth: 460,
+      fontSize: commentBoxConfig.fontSize || 12
+    };
+  }
+
+  // Invariant: Merges new configuration updates, persists to localStorage, and updates UI.
+  // Why: Guarantees instantaneous visual responsiveness when users adjust comment box settings.
+  // Example: applyConfig({ widthMode: 'wide' }) immediately broadens cards and saves to localStorage.
+  function applyConfig(cfg) {
+    if (!cfg || typeof cfg !== 'object') return;
+    commentBoxConfig = { ...commentBoxConfig, ...cfg };
+    try {
+      localStorage.setItem('omnicomment.commentBoxConfig', JSON.stringify(commentBoxConfig));
+    } catch {}
+    syncZonePositions();
+    renderInlineZones();
+  }
 
   // Inline new-comment draft state
   let newCommentDraft = null; // { anchorText: string, blockEl: Element | null }
@@ -996,11 +1103,30 @@ export function initOmniAnnotations(getMarkdownValue) {
       const top = Math.round(blockRect.bottom + 2);
       const left = Math.round(blockRect.left);
 
+      // Invariant: Apply configured width boundaries and typography parameters to the inline comment card.
+      // Why: Respects user-configured density (compact, standard, wide, custom) and visual toggles.
+      // Example: zoneEl styled with minWidth 280px, maxWidth 360px, fontSize 11px in compact mode.
+      const dims = resolveEffectiveDimensions();
       zoneEl.style.top = `${top}px`;
       zoneEl.style.left = `${left}px`;
       zoneEl.style.width = 'fit-content';
-      zoneEl.style.maxWidth = '320px';
-      zoneEl.style.minWidth = '130px';
+      zoneEl.style.maxWidth = `${dims.maxWidth}px`;
+      zoneEl.style.minWidth = `${dims.minWidth}px`;
+      zoneEl.style.setProperty('--omni-comment-min-width', `${dims.minWidth}px`);
+      zoneEl.style.setProperty('--omni-comment-max-width', `${dims.maxWidth}px`);
+      zoneEl.style.setProperty('--omni-comment-font-size', `${dims.fontSize}px`);
+
+      if (!commentBoxConfig.showAvatars) {
+        zoneEl.classList.add('no-avatars');
+      } else {
+        zoneEl.classList.remove('no-avatars');
+      }
+
+      if (!commentBoxConfig.showThreadGuide) {
+        zoneEl.classList.add('no-thread-guide');
+      } else {
+        zoneEl.classList.remove('no-thread-guide');
+      }
 
       const arrowEl = zoneEl.querySelector('.omni-inline-zone__arrow');
       if (arrowEl) {
@@ -1082,6 +1208,59 @@ export function initOmniAnnotations(getMarkdownValue) {
     }
   }
 
+  // Invariant: Constructs the interactive configuration popover HTML anchored to a comment card.
+  // Why: Allows in-place adjustment of comment box density, typography, markdown parsing, and thread guide.
+  // Example: renderConfigPopoverHtml('c1') generates popover with segmented buttons and toggle checkboxes.
+  function renderConfigPopoverHtml(targetId) {
+    const dims = resolveEffectiveDimensions();
+    const mode = commentBoxConfig.widthMode || 'standard';
+    const fs = dims.fontSize;
+
+    return `
+      <div class="omni-config-popover" data-popover-target="${escapeHtml(targetId)}">
+        <div class="omni-config-popover__title">
+          <span>Comment Box Settings</span>
+          <button type="button" class="omni-config-popover__close" data-action="close-config-popover" title="Close">
+            <i class="codicon codicon-close"></i>
+          </button>
+        </div>
+        <div class="omni-config-popover__section">
+          <label class="omni-config-popover__label">Size / Width</label>
+          <div class="omni-config-segmented">
+            <button type="button" class="omni-config-seg-btn ${mode === 'compact' ? 'is-active' : ''}" data-config-set="widthMode" data-config-val="compact">Compact</button>
+            <button type="button" class="omni-config-seg-btn ${mode === 'standard' ? 'is-active' : ''}" data-config-set="widthMode" data-config-val="standard">Standard</button>
+            <button type="button" class="omni-config-seg-btn ${mode === 'wide' ? 'is-active' : ''}" data-config-set="widthMode" data-config-val="wide">Wide</button>
+          </div>
+        </div>
+        <div class="omni-config-popover__section">
+          <label class="omni-config-popover__label">Font Size</label>
+          <div class="omni-config-segmented">
+            <button type="button" class="omni-config-seg-btn ${fs === 11 ? 'is-active' : ''}" data-config-set="fontSize" data-config-val="11">11px</button>
+            <button type="button" class="omni-config-seg-btn ${fs === 12 ? 'is-active' : ''}" data-config-set="fontSize" data-config-val="12">12px</button>
+            <button type="button" class="omni-config-seg-btn ${fs === 14 ? 'is-active' : ''}" data-config-set="fontSize" data-config-val="14">14px</button>
+          </div>
+        </div>
+        <div class="omni-config-popover__section omni-config-toggles">
+          <label class="omni-config-checkbox-label">
+            <input type="checkbox" data-config-toggle="enableMarkdown" ${commentBoxConfig.enableMarkdown ? 'checked' : ''} />
+            <span>Markdown formatting</span>
+          </label>
+          <label class="omni-config-checkbox-label">
+            <input type="checkbox" data-config-toggle="showAvatars" ${commentBoxConfig.showAvatars ? 'checked' : ''} />
+            <span>Author avatars</span>
+          </label>
+          <label class="omni-config-checkbox-label">
+            <input type="checkbox" data-config-toggle="showThreadGuide" ${commentBoxConfig.showThreadGuide ? 'checked' : ''} />
+            <span>Thread connector line</span>
+          </label>
+        </div>
+        <div class="omni-config-popover__footer">
+          <button type="button" class="omni-config-more-btn" data-action="open-full-settings">More settings...</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderThreadHtml(comment) {
     if (collapsedComments.has(comment.id)) {
       return '';
@@ -1099,11 +1278,12 @@ export function initOmniAnnotations(getMarkdownValue) {
       <div class="omni-inline-thread ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
     }" data-comment-id="${escapeHtml(comment.id)}">
-        <!-- Compact Single-Row Header -->
+        <!-- Compact Header with Avatar -->
         <div class="omni-inline-thread__header">
           <div class="omni-inline-thread__header-left" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
             comment.id
           )}" title="Click to toggle collapse">
+            <span class="omni-inline-avatar">${escapeHtml(getAuthorInitial(comment.author))}</span>
             <span class="omni-inline-author">${escapeHtml(comment.author || 'User')}</span>
             <span class="omni-inline-sep">·</span>
             <span class="omni-inline-time">${escapeHtml(
@@ -1116,6 +1296,11 @@ export function initOmniAnnotations(getMarkdownValue) {
             }
           </div>
           <div class="omni-inline-thread__header-actions">
+            <button type="button" class="omni-inline-header-btn omni-hover-action" data-action="configure-comment-box" data-comment-id="${escapeHtml(
+              comment.id
+            )}" title="Configure Comment Box">
+              <i class="codicon codicon-settings-gear"></i>
+            </button>
             <button type="button" class="omni-inline-header-btn omni-hover-action" data-action="thumbs-up" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Thumbs up">
@@ -1149,8 +1334,10 @@ export function initOmniAnnotations(getMarkdownValue) {
           </div>
         </div>
 
+        ${activeConfigPopoverZoneId === comment.id ? renderConfigPopoverHtml(comment.id) : ''}
+
         <div class="omni-inline-thread__body">
-            <!-- Root Comment Text -->
+            <!-- Root Comment Text with Markdown Support -->
             <div class="omni-inline-item omni-inline-item--root">
               ${
                 isEditing
@@ -1171,13 +1358,15 @@ export function initOmniAnnotations(getMarkdownValue) {
                   </div>
                 </div>
               `
-                  : `<div class="omni-inline-item__text">${escapeHtml(
-                      comment.content
-                    )}</div>`
+                  : `<div class="omni-inline-item__text">${
+                      commentBoxConfig.enableMarkdown
+                        ? renderCommentMarkdown(comment.content)
+                        : escapeHtml(comment.content).replace(/\n/g, '<br>')
+                    }</div>`
               }
             </div>
 
-            <!-- Responses / Replies -->
+            <!-- Responses / Replies Thread -->
             ${
               hasReplies
                 ? `
@@ -1185,9 +1374,10 @@ export function initOmniAnnotations(getMarkdownValue) {
                 <button type="button" class="omni-inline-replies-toggle" data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
-                  ${areRepliesCollapsed ? '▸ Show' : '▾ Hide'} ${replies.length} ${
-                    replies.length === 1 ? 'response' : 'responses'
-                  }
+                  <i class="codicon codicon-${areRepliesCollapsed ? 'chevron-right' : 'chevron-down'}"></i>
+                  <span>${replies.length} ${
+                    replies.length === 1 ? 'reply' : 'replies'
+                  }</span>
                 </button>
                 ${
                   areRepliesCollapsed
@@ -1201,6 +1391,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                         r.id
                       )}">
                         <div class="omni-inline-item__meta">
+                          <span class="omni-inline-avatar is-reply">${escapeHtml(getAuthorInitial(r.author))}</span>
                           <span class="omni-inline-item__author">${escapeHtml(
                             r.author
                           )}</span>
@@ -1215,7 +1406,11 @@ export function initOmniAnnotations(getMarkdownValue) {
                             )}" title="Delete response"><i class="codicon codicon-trash"></i></button>
                           </div>
                         </div>
-                        <div class="omni-inline-item__text">${escapeHtml(r.content)}</div>
+                        <div class="omni-inline-item__text">${
+                          commentBoxConfig.enableMarkdown
+                            ? renderCommentMarkdown(r.content)
+                            : escapeHtml(r.content).replace(/\n/g, '<br>')
+                        }</div>
                       </div>
                     `
                       )
@@ -1228,21 +1423,20 @@ export function initOmniAnnotations(getMarkdownValue) {
                 : ''
             }
 
-            <!-- On-Demand Sleek Inline Reply Trigger / Box -->
+            <!-- On-Demand Inline Reply Composer -->
             ${
               isReplying
                 ? `
               <div class="omni-inline-reply-container is-active" data-reply-container="${escapeHtml(
                 comment.id
               )}">
-                <input
-                  type="text"
+                <textarea
                   id="omni-reply-input-${escapeHtml(comment.id)}"
-                  class="omni-inline-reply-input"
+                  class="omni-inline-textarea omni-inline-reply-input"
+                  rows="2"
                   data-comment-id="${escapeHtml(comment.id)}"
-                  placeholder="Reply... (Enter to reply, Esc to cancel)"
-                  autocomplete="off"
-                />
+                  placeholder="Reply... (${commentBoxConfig.enableMarkdown ? 'Markdown supported, ' : ''}Ctrl+Enter to reply, Esc to cancel)"
+                ></textarea>
                 <div class="omni-inline-reply-actions">
                   <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
                     comment.id
@@ -1253,8 +1447,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                 </div>
               </div>
             `
-                : hasReplies
-                ? `
+                : `
               <div class="omni-inline-reply-container" data-reply-container="${escapeHtml(
                 comment.id
               )}">
@@ -1262,11 +1455,10 @@ export function initOmniAnnotations(getMarkdownValue) {
                   comment.id
                 )}" title="Add a reply">
                   <i class="codicon codicon-reply"></i>
-                  <span>Reply</span>
+                  <span>Reply...</span>
                 </button>
               </div>
             `
-                : ''
             }
           </div>
       </div>
@@ -1278,6 +1470,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       <div class="omni-inline-thread omni-inline-new-comment is-focused">
         <div class="omni-inline-thread__header">
           <div class="omni-inline-thread__header-left">
+            <span class="omni-inline-avatar">💬</span>
             <span class="omni-inline-author">New Comment</span>
             ${
               draft.anchorText
@@ -1288,11 +1481,15 @@ export function initOmniAnnotations(getMarkdownValue) {
             }
           </div>
           <div class="omni-inline-thread__header-actions">
+            <button type="button" class="omni-inline-header-btn" data-action="configure-comment-box" data-comment-id="new-comment" title="Configure Comment Box">
+              <i class="codicon codicon-settings-gear"></i>
+            </button>
             <button type="button" class="omni-inline-header-btn" data-action="cancel-new-comment" title="Cancel">
               <i class="codicon codicon-close"></i>
             </button>
           </div>
         </div>
+        ${activeConfigPopoverZoneId === 'new-comment' ? renderConfigPopoverHtml('new-comment') : ''}
         <div class="omni-inline-thread__body">
           ${
             !draft.anchorText
@@ -1309,7 +1506,7 @@ export function initOmniAnnotations(getMarkdownValue) {
             id="omni-inline-new-comment-input"
             class="omni-inline-textarea"
             rows="2"
-            placeholder="Add a comment... (Ctrl+Enter to save)"
+            placeholder="Add a comment... (${commentBoxConfig.enableMarkdown ? 'Markdown supported, ' : ''}Ctrl+Enter to save)"
           ></textarea>
           <div class="omni-inline-form-actions">
             <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-new-comment">Cancel</button>
@@ -1454,6 +1651,20 @@ export function initOmniAnnotations(getMarkdownValue) {
             newCommentDraft = null;
             renderInlineZones();
             break;
+          case 'configure-comment-box':
+            activeConfigPopoverZoneId =
+              activeConfigPopoverZoneId === commentId ? null : commentId;
+            renderInlineZones();
+            break;
+          case 'close-config-popover':
+            activeConfigPopoverZoneId = null;
+            renderInlineZones();
+            break;
+          case 'open-full-settings':
+            if (window.vscodeEvent) {
+              window.vscodeEvent.emit('command', 'omnicomment.configureCommentBox');
+            }
+            break;
           case 'submit-new-comment': {
             const anchorEl = zonesLayer.querySelector('#omni-inline-new-comment-anchor');
             const contentEl = zonesLayer.querySelector('#omni-inline-new-comment-input');
@@ -1471,6 +1682,39 @@ export function initOmniAnnotations(getMarkdownValue) {
             }
             break;
           }
+        }
+      });
+    });
+
+    // Invariant: Bind segmented density and font-size buttons inside the comment box configuration popover.
+    // Why: Updates active comment box bounds instantly and persists preference to local storage and VS Code.
+    // Example: clicking 'Compact' sets widthMode to 'compact' and triggers live card resize.
+    zonesLayer.querySelectorAll('[data-config-set]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const prop = btn.getAttribute('data-config-set');
+        let val = btn.getAttribute('data-config-val');
+        if (prop === 'fontSize') {
+          val = parseInt(val, 10);
+        }
+        applyConfig({ [prop]: val });
+        if (window.vscodeEvent) {
+          window.vscodeEvent.emit('command', 'omnicomment.saveCommentBoxConfig', { [prop]: val });
+        }
+      });
+    });
+
+    // Invariant: Bind toggle checkboxes for markdown parsing, avatars, and thread guide lines.
+    // Why: Allows immediate customization of comment card visual complexity directly from the header popover.
+    // Example: unchecking 'enableMarkdown' switches from formatted markdown to plain text with line breaks.
+    zonesLayer.querySelectorAll('[data-config-toggle]').forEach(chk => {
+      chk.addEventListener('change', e => {
+        e.stopPropagation();
+        const prop = chk.getAttribute('data-config-toggle');
+        const val = chk.checked;
+        applyConfig({ [prop]: val });
+        if (window.vscodeEvent) {
+          window.vscodeEvent.emit('command', 'omnicomment.saveCommentBoxConfig', { [prop]: val });
         }
       });
     });
@@ -1495,7 +1739,10 @@ export function initOmniAnnotations(getMarkdownValue) {
       });
 
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          container?.querySelector('[data-action="submit-reply"]')?.click();
+        } else if (e.key === 'Enter' && !e.shiftKey && input.tagName !== 'TEXTAREA') {
           e.preventDefault();
           container?.querySelector('[data-action="submit-reply"]')?.click();
         } else if (e.key === 'Escape') {
@@ -2024,7 +2271,9 @@ export function initOmniAnnotations(getMarkdownValue) {
     focusCommentById,
     openAddCommentComposer,
     syncFromExternalUpdate,
-    getInlineState
+    getInlineState,
+    applyConfig,
+    getConfig: () => ({ ...commentBoxConfig })
   };
 }
 

@@ -9,9 +9,13 @@ import {
   getCommentDecoratorForTesting,
   getCommentServiceForTesting,
   getInlineCommentControllerForTesting,
+  getCommentBoxConfig,
+  saveCommentBoxConfigHandler,
   resolveAnchorSelectionForThread
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
+import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
+import { resolveCommentBoxDimensions } from '../../core/types';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
@@ -357,5 +361,107 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     assert.doesNotThrow(() => {
       decorator.updateSelectionDecoration(editor);
     });
+  });
+
+  // Topology: Markdown text -> OmniCommentInlineItem -> verify body is MarkdownString with rich markdown
+  // Expected: OmniCommentInlineItem body is an instance of vscode.MarkdownString containing formatted text.
+  test('Txt 7: OmniCommentInlineItem formats markdown strings properly for root and reply comments', () => {
+    const rootItem = new OmniCommentInlineItem(
+      'c-1',
+      undefined,
+      'Reviewing **critical** section with `test()` code',
+      'Alice',
+      new Date().toISOString(),
+      'anchor phrase',
+      'Line 10'
+    );
+    assert.strictEqual(rootItem.body.isTrusted, true);
+    assert.ok(rootItem.body.value.includes('**critical**'));
+    assert.ok(rootItem.body.value.includes('`test()`'));
+    assert.ok(rootItem.body.value.includes('> **Line 10:** `anchor phrase`'));
+
+    const replyItem = new OmniCommentInlineItem(
+      'c-1',
+      'r-1',
+      'Reply with [documentation link](https://example.com)',
+      'Bob',
+      new Date().toISOString()
+    );
+    assert.ok(replyItem.body.value.includes('[documentation link](https://example.com)'));
+  });
+
+  // Topology: Read index.css & omniAnnotations.js -> verify redesigned compact sizing and thread connector
+  // Expected: Card width is min 300px, max 440px, replies list has border-left indent guide, avatar is styled.
+  test('Txt 8: Inline comment card redesign verifies compact dimensions, thread guide, and markdown styling', () => {
+    const cssPath = path.join(__dirname, '../../../media/markdown-editor/index.css');
+    const cssContent = fs.readFileSync(cssPath, 'utf-8');
+    assert.ok(cssContent.includes('300px') && cssContent.includes('min-width'), 'Must enforce compact min-width 300px');
+    assert.ok(cssContent.includes('440px') && cssContent.includes('max-width'), 'Must enforce compact max-width 440px');
+    assert.ok(cssContent.includes('border-left: 2px solid'), 'Must include thread connector guide');
+    assert.ok(cssContent.includes('.omni-inline-avatar'), 'Must include avatar style');
+    assert.ok(cssContent.includes('.omni-comment-inline-code'), 'Must include inline code styling');
+    assert.ok(cssContent.includes('.omni-comment-code-block'), 'Must include code block styling');
+  });
+
+  // Topology: resolveCommentBoxDimensions({ widthMode: ... }) -> verify minWidth, maxWidth, fontSize
+  // Expected: Compact = 280-360px/11px, Standard = 320-460px/12px, Wide = 420-640px/13px, Custom = user values.
+  test('Txt 9: resolveCommentBoxDimensions correctly calculates bounds across compact, standard, wide, and custom modes', () => {
+    const compactDims = resolveCommentBoxDimensions({ widthMode: 'compact' });
+    assert.strictEqual(compactDims.minWidth, 280);
+    assert.strictEqual(compactDims.maxWidth, 360);
+    assert.strictEqual(compactDims.fontSize, 11);
+
+    const standardDims = resolveCommentBoxDimensions({ widthMode: 'standard' });
+    assert.strictEqual(standardDims.minWidth, 320);
+    assert.strictEqual(standardDims.maxWidth, 460);
+    assert.strictEqual(standardDims.fontSize, 12);
+
+    const wideDims = resolveCommentBoxDimensions({ widthMode: 'wide' });
+    assert.strictEqual(wideDims.minWidth, 420);
+    assert.strictEqual(wideDims.maxWidth, 640);
+    assert.strictEqual(wideDims.fontSize, 13);
+
+    const customDims = resolveCommentBoxDimensions({
+      widthMode: 'custom',
+      minWidth: 500,
+      maxWidth: 750,
+      fontSize: 15
+    });
+    assert.strictEqual(customDims.minWidth, 500);
+    assert.strictEqual(customDims.maxWidth, 750);
+    assert.strictEqual(customDims.fontSize, 15);
+  });
+
+  // Topology: omniAnnotations.js & package.json -> verify configuration popover, commands, and settings schema
+  // Expected: package.json contributes commentBox configuration; omniAnnotations includes gear button and popover HTML.
+  test('Txt 10: Configurable comment box features (settings gear, popover controls, default author fallback, and commands) are present and operational', async () => {
+    const pkgPath = path.join(__dirname, '../../../package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    const configProps = pkg.contributes.configuration.properties;
+
+    assert.ok(configProps['omnicomment.commentBox.widthMode'], 'Must declare widthMode setting');
+    assert.ok(configProps['omnicomment.commentBox.minWidth'], 'Must declare minWidth setting');
+    assert.ok(configProps['omnicomment.commentBox.maxWidth'], 'Must declare maxWidth setting');
+    assert.ok(configProps['omnicomment.commentBox.fontSize'], 'Must declare fontSize setting');
+    assert.ok(configProps['omnicomment.commentBox.enableMarkdown'], 'Must declare enableMarkdown setting');
+    assert.ok(configProps['omnicomment.commentBox.showAvatars'], 'Must declare showAvatars setting');
+    assert.ok(configProps['omnicomment.commentBox.showThreadGuide'], 'Must declare showThreadGuide setting');
+    assert.ok(configProps['omnicomment.commentBox.defaultAuthor'], 'Must declare defaultAuthor setting');
+
+    const jsPath = path.join(__dirname, '../../../media/markdown-editor/omniAnnotations.js');
+    const jsContent = fs.readFileSync(jsPath, 'utf-8');
+    assert.ok(jsContent.includes('data-action="configure-comment-box"'), 'Must have gear button trigger');
+    assert.ok(jsContent.includes('omni-config-popover'), 'Must render configuration popover');
+    assert.ok(jsContent.includes('data-config-set="widthMode"'), 'Must allow setting width mode');
+    assert.ok(jsContent.includes('data-config-toggle="enableMarkdown"'), 'Must allow toggling markdown');
+
+    // Test getCommentBoxConfig and saveCommentBoxConfigHandler
+    const currentConfig = getCommentBoxConfig();
+    assert.ok(typeof currentConfig.widthMode === 'string');
+    assert.ok(typeof currentConfig.fontSize === 'number');
+
+    await saveCommentBoxConfigHandler({ fontSize: 13 });
+    const updated = getCommentBoxConfig();
+    assert.strictEqual(updated.fontSize, 13);
   });
 });

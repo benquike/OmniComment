@@ -5,7 +5,7 @@ import { mapVscodeLanguageToVditorLang } from "./lang.js";
 import { bindLinkErrors } from "./linkError.js";
 import { refreshExportDialogProState } from "./exportDialog.js";
 import { toggleMarkmapView, refreshMarkmapProLock } from "./markmapView.js";
-import { initOmniAnnotations } from "./omniAnnotations.js?v=0.1.5";
+import { initOmniAnnotations } from "./omniAnnotations.js?v=0.1.7";
 
 
 const removeLockedDecorations = (root) => {
@@ -302,6 +302,15 @@ handler.on("open", async (md) => {
       };
       handler.on("focusOmniComment", handleFocusComment);
       handler.on("focusMarkcoComment", handleFocusComment);
+      // Invariant: Listens for external comment box configuration updates from the extension host.
+      // Why: Propagates user setting modifications (density presets, font size, markdown toggles) to the webview.
+      // Example: handler.on('updateOmniCommentConfig', { widthMode: 'compact' }) updates active card layout.
+      handler.on("updateOmniCommentConfig", (cfg) => {
+        omniAnnotations?.applyConfig?.(cfg);
+      });
+      handler.on("updateMarkcoCommentConfig", (cfg) => {
+        omniAnnotations?.applyConfig?.(cfg);
+      });
       handler.on("openAddCommentInEditor", (payload) => {
         const text = typeof payload === 'string' ? payload : (payload?.selectedText || '');
         if (omniAnnotations) {

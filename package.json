@@ -2,7 +2,7 @@
   "name": "omnicomment",
   "displayName": "OmniComment - Universal Comments & Annotations",
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "license": "MIT",
   "publisher": "benquike",
   "repository": {
@@ -151,6 +151,11 @@
         "command": "omnicomment.agent.deleteComment",
         "title": "Agent: Delete Comment",
         "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.configureCommentBox",
+        "title": "Configure Comment Box...",
+        "category": "OmniComment"
       }
     ],
     "menus": {
@@ -159,18 +164,28 @@
           "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
           "command": "omnicomment.addComment",
           "group": "navigation@1"
+        },
+        {
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
+          "command": "omnicomment.configureCommentBox",
+          "group": "navigation@2"
         }
       ],
       "editor/title": [
         {
           "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
           "command": "omnicomment.addComment",
-          "group": "navigation"
+          "group": "navigation@1"
         },
         {
           "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log",
           "command": "omnicomment.toggleCollapseAllComments",
-          "group": "navigation"
+          "group": "navigation@2"
+        },
+        {
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
+          "command": "omnicomment.configureCommentBox",
+          "group": "navigation@3"
         }
       ],
       "comments/commentThread/context": [
@@ -178,6 +193,11 @@
           "command": "omnicomment.inlineReplyComment",
           "when": "commentController == omnicomment-inline",
           "group": "inline"
+        },
+        {
+          "command": "omnicomment.configureCommentBox",
+          "when": "commentController == omnicomment-inline",
+          "group": "inline@2"
         }
       ],
       "comments/commentThread/title": [
@@ -195,6 +215,11 @@
           "command": "omnicomment.inlineDeleteThread",
           "when": "commentController == omnicomment-inline",
           "group": "navigation@3"
+        },
+        {
+          "command": "omnicomment.configureCommentBox",
+          "when": "commentController == omnicomment-inline",
+          "group": "navigation@4"
         }
       ],
       "comments/comment/title": [
@@ -238,6 +263,58 @@
           "type": "string",
           "default": "rgba(255, 212, 0, 0.8)",
           "description": "Border color for comment highlights"
+        },
+        "omnicomment.commentBox.widthMode": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "standard",
+            "wide",
+            "custom"
+          ],
+          "default": "standard",
+          "description": "Width density preset for inline comment cards: compact (280-360px), standard (320-460px), wide (420-640px), or custom"
+        },
+        "omnicomment.commentBox.minWidth": {
+          "type": "number",
+          "default": 320,
+          "minimum": 200,
+          "maximum": 1200,
+          "description": "Minimum width in pixels for the comment box (used when widthMode is 'custom' or as lower bound)"
+        },
+        "omnicomment.commentBox.maxWidth": {
+          "type": "number",
+          "default": 460,
+          "minimum": 240,
+          "maximum": 1600,
+          "description": "Maximum width in pixels for the comment box (used when widthMode is 'custom' or as upper bound)"
+        },
+        "omnicomment.commentBox.fontSize": {
+          "type": "number",
+          "default": 12,
+          "minimum": 9,
+          "maximum": 24,
+          "description": "Base font size in pixels for comment cards and thread content"
+        },
+        "omnicomment.commentBox.enableMarkdown": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to render rich Markdown (code blocks, quotes, lists, bold, links) inside comments"
+        },
+        "omnicomment.commentBox.showAvatars": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show author initial avatar badges in comment headers and replies"
+        },
+        "omnicomment.commentBox.showThreadGuide": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display a vertical connector guide line for reply discussion threads"
+        },
+        "omnicomment.commentBox.defaultAuthor": {
+          "type": "string",
+          "default": "",
+          "description": "Default author name for new comments and replies (falls back to git user name or OS username)"
         }
       }
     },

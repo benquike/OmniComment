@@ -127,4 +127,9 @@ export type SidebarMessage =
       commentInput: string;
       renderedCount: number;
     }
-  | { type: 'fillAndSubmitForm'; content: string; anchorText?: string };
+  | { type: 'fillAndSubmitForm'; content: string; anchorText?: string }
+  | { type: 'configureCommentBox' }
+  | { type: 'setCommentBoxConfig'; config: import('./commentBoxConfig').CommentBoxConfig };
+
+export * from './commentBoxConfig';
+
