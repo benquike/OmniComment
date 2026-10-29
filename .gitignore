@@ -30,6 +30,10 @@ ui-debug.log*
 # Server builds & dependencies
 servers/**/dist/
 servers/**/node_modules/
+__pycache__/
+*.pyc
+*.sqlite*
+*.db
 
 # Test data
 .vscode-test/

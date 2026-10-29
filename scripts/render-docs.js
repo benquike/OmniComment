@@ -103,6 +103,15 @@ const PAGES = [
     description: 'Serverless backend with Firebase Cloud Functions v2 and Firestore real-time sync.'
   },
   {
+    id: 'server-frameworks-guide',
+    title: 'Server Frameworks Integration',
+    shortTitle: 'Server Frameworks Guide',
+    category: 'Backend & Cloud',
+    source: 'docs/SERVER_FRAMEWORKS_GUIDE.md',
+    dest: 'server-frameworks-guide.html',
+    description: 'Server-side persistence in Python (FastAPI/Flask), Go (Gin), PHP 8/Laravel, and Node.js.'
+  },
+  {
     id: 'chrome-extension-guide',
     title: 'Chrome Extension Guide',
     shortTitle: 'Chrome Extension Guide',

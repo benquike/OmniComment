@@ -1,0 +1,17 @@
+{
+  "name": "omnicomment/php-server",
+  "description": "OmniComment PHP 8.2+ REST Persistence Server with PDO SQLite",
+  "type": "project",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "OmniComment\\": "src/"
+    }
+  },
+  "require": {
+    "php": ">=8.1",
+    "ext-pdo": "*",
+    "ext-pdo_sqlite": "*",
+    "ext-json": "*"
+  }
+}

@@ -373,6 +373,11 @@ export async function DELETE(
 }
 ```
 
+> [!TIP]
+> **Looking for backend servers in Python, Go, PHP, or Java?**
+> OmniComment provides production-ready, standalone backend implementations in [`servers/python-fastapi/`](../servers/python-fastapi/), [`servers/go-gin/`](../servers/go-gin/), and [`servers/php/`](../servers/php/). For architecture details, database schemas, and framework-specific deployment instructions, see the dedicated [Server Frameworks Guide](docs/SERVER_FRAMEWORKS_GUIDE.md).
+
+
 ---
 
 ### Approach 2: Local-First Offline Storage (IndexedDB & LocalStorage)
