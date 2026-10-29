@@ -7,13 +7,13 @@
 ### Universal In-Context Comments, Highlights, and Collaboration for Humans & AI
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg?style=flat-square)](https://github.com/benquike/OmniComment)
-[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg?style=flat-square)](file:///usr/local/google/home/phui/src/tools/editor/Markco/LICENSE)
-[![Tests: 77 Passing](https://img.shields.io/badge/tests-77%20passing-brightgreen.svg?style=flat-square)](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/test/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg?style=flat-square)](../LICENSE)
+[![Tests: 83 Passing](https://img.shields.io/badge/tests-83%20passing-brightgreen.svg?style=flat-square)](../src/test/)
 [![VS Code](https://img.shields.io/badge/VS%20Code-^1.85.0-007ACC.svg?style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/)
-[![Web Component](https://img.shields.io/badge/Web%20Component-%3Comni--comment%3E-orange.svg?style=flat-square)](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)
-[![Agent Ready](https://img.shields.io/badge/AI%20Agent-First--Class%20API-purple.svg?style=flat-square)](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)
+[![Web Component](https://img.shields.io/badge/Web%20Component-%3Comni--comment%3E-orange.svg?style=flat-square)](INTEGRATION_GUIDE.md)
+[![Agent Ready](https://img.shields.io/badge/AI%20Agent-First--Class%20API-purple.svg?style=flat-square)](AGENT_API.md)
 
-[**Getting Started Tutorial**](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/TUTORIAL.md) · [**Full API Reference**](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/API_REFERENCE.md) · [**Integration Guide**](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md) · [**Architecture**](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md) · [**Presets**](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)
+[**Tutorial**](TUTORIAL.md) · [**API Reference**](API_REFERENCE.md) · [**Web Apps**](WEBAPP_GUIDE.md) · [**Chrome Extension**](CHROME_EXTENSION_GUIDE.md) · [**Terminal TUI**](TUI_APPS_GUIDE.md) · [**VS Code Modes**](VSCODE_MODES_GUIDE.md) · [**Presets**](CONFIGURATION_PRESETS.md) · [**Architecture**](ARCHITECTURE.md)
 
 </div>
 
@@ -23,11 +23,11 @@
 
 **OmniComment** is a universal annotation, threaded discussion, and collaborative review system that works everywhere you read and write:
 
-1. **In Your Code Editor**: Rich inline comment bubbles and collapsible thread zones right next to your Markdown, code, and documentation in **VS Code**.
-2. **On the Web**: A zero-dependency `<omni-comment>` custom web component that embeds interactive commenting into Docusaurus, VitePress, Next.js, Hugo, or raw HTML in one line of code.
-3. **Across the Browser**: A Chrome Manifest V3 extension for capturing highlights, personal notes, and team feedback on any live website or web app.
-4. **Inside the Terminal**: An ANSI terminal renderer that formats comment threads into box-drawing inspection cards for CLI pipelines and Neovim users.
-5. **For Autonomous AI Agents**: Structured, programmatic API commands (`omnicomment.agent.*`) that let LLMs, code-review bots, and automated agents inspect document context, post targeted feedback, and resolve threads.
+1. **In Your Code Editor**: Rich inline comment bubbles, diff reviews, Vditor WYSIWYG, and Jupyter notebook support in **VS Code** (see [VS Code Editor Modes Guide](VSCODE_MODES_GUIDE.md)).
+2. **On the Web**: Zero-dependency `<omni-comment>` custom web component for React, Next.js, Vue, Nuxt, Svelte, Docusaurus, and VitePress with real-time WebSocket sync (see [Web Applications Guide](WEBAPP_GUIDE.md) & [Integration Guide](INTEGRATION_GUIDE.md)).
+3. **Across the Browser**: A Chrome Manifest V3 extension for capturing highlights, personal notes, and team feedback on any live website using W3C TextQuoteSelectors (see [Chrome Extension Guide](CHROME_EXTENSION_GUIDE.md)).
+4. **Inside the Terminal**: An ANSI terminal renderer, Neovim `virt_lines` extmark plugin, Python Textual app, and Go Bubbletea UI for CLI workflows (see [Terminal & TUI Guide](TUI_APPS_GUIDE.md)).
+5. **For Autonomous AI Agents**: Structured, programmatic API commands (`omnicomment.agent.*`) and MCP tools that let LLMs inspect context, post targeted reviews, and resolve threads (see [AI Agent API Guide](AGENT_API.md)).
 
 > [!TIP]
 > **Zero Vendor Lock-In**: Comments can be stored directly within your Markdown files using human-readable, Git-versioned comments (`<!-- omnicomment ... -->`), in local files, or synced to cloud endpoints.
@@ -187,9 +187,13 @@ Switch presets anytime in VS Code via `OmniComment: Apply Preset Configuration..
 
 ---
 
-## Next Steps
+## Next Steps & Dedicated Guides
 
-- **Follow the [Step-by-Step Tutorial](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/TUTORIAL.md)** for detailed guides across VS Code, Web, TUI, and AI agent automation.
-- **Consult the [Comprehensive API Reference](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/API_REFERENCE.md)** for data models, function signatures, and event hooks.
-- **Learn how to embed on websites in the [Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)** (Docusaurus, VitePress, Hugo, Chrome extensions).
-- **Inspect the technical design in the [Architecture Specification](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)**.
+- **Follow the [Step-by-Step Tutorial](TUTORIAL.md)** for hands-on workflows across VS Code, presets, web embedding, and AI bots.
+- **Consult the [Comprehensive API Reference](API_REFERENCE.md)** for data models, function signatures, and event hooks.
+- **Learn how to embed on websites in the [Web Applications Guide](WEBAPP_GUIDE.md)** (React, Next.js, Vue, Nuxt, Svelte, Supabase, WebSockets).
+- **Build browser annotation tools with the [Chrome Extension Guide](CHROME_EXTENSION_GUIDE.md)** (Manifest V3, W3C TextQuoteSelector, Shadow DOM).
+- **Run in terminals with the [Terminal & TUI Guide](TUI_APPS_GUIDE.md)** (CLI, Neovim `virt_lines` extmarks, Python Textual, Go Bubbletea).
+- **Master editor surfaces with the [VS Code Editor Modes Guide](VSCODE_MODES_GUIDE.md)** (TextEditor, Vditor WYSIWYG, Jupyter Notebooks, Git diffs).
+- **Explore static site integrations in the [Integration Guide](INTEGRATION_GUIDE.md)** (Docusaurus, VitePress, Hugo).
+- **Inspect the technical design in the [Architecture Specification](ARCHITECTURE.md)**.

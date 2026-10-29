@@ -33,8 +33,6 @@ export class OmniCommentInlineItem implements vscode.Comment {
   }
 }
 
-export class MarkcoInlineCommentItem extends OmniCommentInlineItem {}
-
 export class InlineCommentController implements vscode.Disposable {
   private readonly _controller: vscode.CommentController;
   private readonly _threadsByDoc = new Map<string, Map<string, vscode.CommentThread>>();
@@ -58,7 +56,7 @@ export class InlineCommentController implements vscode.Disposable {
           return [];
         }
         const text = document.getText();
-        const blockIdx = Math.max(text.lastIndexOf('<!-- omnicomment'), text.lastIndexOf('<!-- markco-comments'));
+        const blockIdx = text.lastIndexOf('<!-- omnicomment');
         const endLine =
           blockIdx !== -1
             ? Math.max(0, document.positionAt(blockIdx).line - 1)

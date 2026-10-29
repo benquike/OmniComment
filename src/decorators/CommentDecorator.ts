@@ -16,13 +16,8 @@ export class CommentDecorator {
 
   private createDecorationType(isFocused: boolean): vscode.TextEditorDecorationType {
     const omniConfig = vscode.workspace.getConfiguration('omnicomment');
-    const legacyConfig = vscode.workspace.getConfiguration('markco');
-    const baseColor =
-      omniConfig.get<string>('highlightColor') ||
-      legacyConfig.get<string>('highlightColor', 'rgba(255, 212, 0, 0.3)');
-    const borderColor =
-      omniConfig.get<string>('highlightBorderColor') ||
-      legacyConfig.get<string>('highlightBorderColor', 'rgba(255, 212, 0, 0.8)');
+    const baseColor = omniConfig.get<string>('highlightColor', 'rgba(255, 212, 0, 0.3)');
+    const borderColor = omniConfig.get<string>('highlightBorderColor', 'rgba(255, 212, 0, 0.8)');
 
     return vscode.window.createTextEditorDecorationType({
       backgroundColor: isFocused ? 'rgba(255, 212, 0, 0.5)' : baseColor,

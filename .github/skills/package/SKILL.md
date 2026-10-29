@@ -59,5 +59,5 @@ Write-Host "Created tag v$version - push with: git push origin main --tags"
 ## Notes
 
 - Requires `@vscode/vsce` to be installed (`npm install -g @vscode/vsce`)
-- The VSIX file will be named `markco-<version>.vsix`
+- The VSIX file will be named `omnicomment-<version>.vsix`
 - Commit the version bump before publishing

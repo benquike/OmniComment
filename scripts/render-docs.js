@@ -85,6 +85,42 @@ const PAGES = [
     description: 'Embed OmniComment in Docusaurus, VitePress, Hugo, Chrome extensions, and TUI.'
   },
   {
+    id: 'webapp-guide',
+    title: 'Web Application Integration',
+    shortTitle: 'Web Applications Guide',
+    category: 'Surfaces & Ecosystem',
+    source: 'docs/WEBAPP_GUIDE.md',
+    dest: 'webapp-guide.html',
+    description: 'Integrate in React, Next.js, Vue 3, Nuxt, Svelte 5, SvelteKit, WebSockets, and Supabase.'
+  },
+  {
+    id: 'chrome-extension-guide',
+    title: 'Chrome Extension Guide',
+    shortTitle: 'Chrome Extension Guide',
+    category: 'Surfaces & Ecosystem',
+    source: 'docs/CHROME_EXTENSION_GUIDE.md',
+    dest: 'chrome-extension-guide.html',
+    description: 'Manifest V3 extension for live web annotations, W3C TextQuoteSelector, and Shadow DOM.'
+  },
+  {
+    id: 'tui-apps-guide',
+    title: 'Terminal & TUI Integration',
+    shortTitle: 'Terminal & TUI Guide',
+    category: 'Surfaces & Ecosystem',
+    source: 'docs/TUI_APPS_GUIDE.md',
+    dest: 'tui-apps-guide.html',
+    description: 'Headless CLI, Neovim virt_lines extmarks, Python Textual, Go Bubbletea, and Git hooks.'
+  },
+  {
+    id: 'vscode-modes-guide',
+    title: 'VS Code Editor Modes Guide',
+    shortTitle: 'VS Code Editor Modes',
+    category: 'Surfaces & Ecosystem',
+    source: 'docs/VSCODE_MODES_GUIDE.md',
+    dest: 'vscode-modes-guide.html',
+    description: 'Standard TextEditor, Vditor WYSIWYG, Jupyter Notebooks (.ipynb), and Git diff reviews.'
+  },
+  {
     id: 'presets',
     title: 'Configuration Presets',
     shortTitle: 'Configuration & Presets',

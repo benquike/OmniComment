@@ -95,6 +95,15 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     // Verify the InlineCommentController created an inline thread and supports collapsing/expanding
     const inlineController = getInlineCommentControllerForTesting();
     assert.strictEqual(inlineController.getThreadCount(fileUri), 1);
+    const docThreads = (inlineController as any)._threadsByDoc.get(fileUri.toString());
+    const thread = docThreads?.get(comments[0].id);
+    assert.ok(thread);
+    const initialState = thread.collapsibleState;
+    inlineController.toggleThreadCollapsibleState(thread);
+    assert.notStrictEqual(thread.collapsibleState, initialState);
+    inlineController.toggleThreadCollapsibleState(thread);
+    assert.strictEqual(thread.collapsibleState, initialState);
+
     assert.strictEqual(inlineController.toggleAllThreads(fileUri), true);
     assert.strictEqual(inlineController.toggleAllThreads(fileUri), false);
   });
@@ -201,7 +210,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
 
       // Verify collapsing the entire inline comment widget via the header chevron (completely hides comment box)
       const afterCollapseThread = await queryMarkdownEditorInlineStateForTesting(
-        '.markco-collapse-chevron'
+        '.omni-collapse-chevron'
       );
       assert.ok(afterCollapseThread);
       assert.strictEqual(afterCollapseThread!.threads[0].isCollapsed, true);
@@ -211,7 +220,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
 
       // Verify re-expanding the inline comment widget by clicking the gutter icon
       const afterExpandThread = await queryMarkdownEditorInlineStateForTesting(
-        '[data-markco-comments]'
+        '[data-omni-comments]'
       );
       assert.ok(afterExpandThread);
       assert.strictEqual(afterExpandThread!.threads[0].isCollapsed, false);
@@ -221,7 +230,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
 
       // Re-collapse via header chevron to verify the comment box is completely hidden again
       const afterReCollapse = await queryMarkdownEditorInlineStateForTesting(
-        '.markco-collapse-chevron'
+        '.omni-collapse-chevron'
       );
       assert.ok(afterReCollapse);
       assert.strictEqual(afterReCollapse!.threads[0].isCollapsed, true);
@@ -238,7 +247,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
       const afterWebviewCommentClick = await queryMarkdownEditorInlineStateForTesting(
         '[data-action="submit-new-comment"]',
         2000,
-        '#markco-inline-new-comment-input',
+        '#omni-inline-new-comment-input',
         secondCommentText
       );
       assert.ok(afterWebviewCommentClick);
@@ -254,8 +263,7 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
     await waitForCondition(() => {
       const diskContent = fs.readFileSync(filePath, 'utf-8');
       return (
-        (diskContent.includes('<!-- omnicomment') ||
-          diskContent.includes('<!-- markco-comments')) &&
+        diskContent.includes('<!-- omnicomment') &&
         diskContent.includes(customCommentText) &&
         diskContent.includes(replyText)
       );

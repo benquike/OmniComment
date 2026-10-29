@@ -180,5 +180,4 @@ export function omniCommentPreviewPlugin(md: MarkdownIt): void {
   });
 }
 
-export const markcoPreviewPlugin = omniCommentPreviewPlugin;
 export default omniCommentPreviewPlugin;

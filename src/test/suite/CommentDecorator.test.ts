@@ -13,12 +13,10 @@ const test = Mocha.test;
 const setup = Mocha.setup;
 const teardown = Mocha.teardown;
 
-// Load OmniComment / Markco spec as test data
-const specPath = fs.existsSync(path.join(__dirname, '../../../spec/OmniComment.md'))
-  ? path.join(__dirname, '../../../spec/OmniComment.md')
-  : path.join(__dirname, '../../../spec/Markco.md');
+// Load OmniComment spec as test data
+const specPath = path.join(__dirname, '../../../spec/OmniComment.md');
 const specContent = fs.readFileSync(specPath, 'utf-8');
-const markcoContent = specContent;
+const omniContent = specContent;
 
 suite('CommentDecorator Test Suite', () => {
   let commentDecorator: CommentDecorator;
@@ -54,8 +52,8 @@ suite('CommentDecorator Test Suite', () => {
   });
 
   suite('findCommentAtPosition', () => {
-    test('should find first comment in Markco.md at its position', () => {
-      const document = createMockDocument(markcoContent);
+    test('should find first comment in OmniComment.md at its position', () => {
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       // Position inside the first comment's anchor (line 2, which is the overview paragraph)
@@ -67,8 +65,8 @@ suite('CommentDecorator Test Suite', () => {
       assert.strictEqual(found?.content, 'Nice overview');
     });
 
-    test('should find second comment in Markco.md at its position', () => {
-      const document = createMockDocument(markcoContent);
+    test('should find second comment in OmniComment.md at its position', () => {
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       // Position inside the second comment's anchor (line 19, "Check grammar")
@@ -81,7 +79,7 @@ suite('CommentDecorator Test Suite', () => {
     });
 
     test('should return undefined when no comment at position', () => {
-      const document = createMockDocument(markcoContent);
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       // Position outside any comment anchor
@@ -123,9 +121,9 @@ suite('CommentDecorator Test Suite', () => {
       commentDecorator.applyDecorations(editor, comments);
     });
 
-    test('should apply decorations for Markco.md comments', async () => {
-      const editor = await createMockEditor(markcoContent);
-      const document = createMockDocument(markcoContent);
+    test('should apply decorations for OmniComment.md comments', async () => {
+      const editor = await createMockEditor(omniContent);
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       // Should not throw and should apply decorations for 2 comments
@@ -134,9 +132,9 @@ suite('CommentDecorator Test Suite', () => {
       assert.strictEqual(comments.length, 4);
     });
 
-    test('should highlight focused comment in Markco.md differently', async () => {
-      const editor = await createMockEditor(markcoContent);
-      const document = createMockDocument(markcoContent);
+    test('should highlight focused comment in OmniComment.md differently', async () => {
+      const editor = await createMockEditor(omniContent);
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       commentDecorator.setFocusedComment('202ba2e2-78e6-410e-9274-33c4069fac71');
@@ -163,9 +161,9 @@ suite('CommentDecorator Test Suite', () => {
   });
 
   suite('navigateToComment', () => {
-    test('should navigate to comment position in Markco.md', async () => {
-      const editor = await createMockEditor(markcoContent);
-      const document = createMockDocument(markcoContent);
+    test('should navigate to comment position in OmniComment.md', async () => {
+      const editor = await createMockEditor(omniContent);
+      const document = createMockDocument(omniContent);
       const comments = commentService.parseComments(document);
       
       // Navigate to first comment

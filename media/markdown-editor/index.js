@@ -5,7 +5,7 @@ import { mapVscodeLanguageToVditorLang } from "./lang.js";
 import { bindLinkErrors } from "./linkError.js";
 import { refreshExportDialogProState } from "./exportDialog.js";
 import { toggleMarkmapView, refreshMarkmapProLock } from "./markmapView.js";
-import { initOmniAnnotations, initMarkcoAnnotations } from "./omniAnnotations.js";
+import { initOmniAnnotations } from "./omniAnnotations.js";
 
 
 const removeLockedDecorations = (root) => {
@@ -297,7 +297,6 @@ handler.on("open", async (md) => {
         }
       };
       handler.on("focusOmniComment", handleFocusComment);
-      handler.on("focusMarkcoComment", handleFocusComment);
       handler.on("openAddCommentInEditor", (payload) => {
         if (omniAnnotations) {
           omniAnnotations.openAddCommentComposer(payload?.selectedText || '');
@@ -306,11 +305,6 @@ handler.on("open", async (md) => {
       const handleQueryInlineState = (payload) => {
         if (payload?.inputSelector && typeof payload.inputValue === 'string') {
           let inputEl = document.querySelector(payload.inputSelector);
-          if (!inputEl && payload.inputSelector.includes('markco')) {
-            inputEl = document.querySelector(payload.inputSelector.replace(/markco/g, 'omni'));
-          } else if (!inputEl && payload.inputSelector.includes('omni')) {
-            inputEl = document.querySelector(payload.inputSelector.replace(/omni/g, 'markco'));
-          }
           if (inputEl && 'value' in inputEl) {
             inputEl.value = payload.inputValue;
             inputEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -318,11 +312,6 @@ handler.on("open", async (md) => {
         }
         if (payload?.clickSelector) {
           let btn = document.querySelector(payload.clickSelector);
-          if (!btn && payload.clickSelector.includes('markco')) {
-            btn = document.querySelector(payload.clickSelector.replace(/markco/g, 'omni'));
-          } else if (!btn && payload.clickSelector.includes('omni')) {
-            btn = document.querySelector(payload.clickSelector.replace(/omni/g, 'markco'));
-          }
           if (btn instanceof HTMLElement) {
             btn.click();
           }
@@ -334,12 +323,11 @@ handler.on("open", async (md) => {
         });
       };
       handler.on("queryOmniInlineState", handleQueryInlineState);
-      handler.on("queryMarkcoInlineState", handleQueryInlineState);
       handler.on("insertImageMarkdown", (markdown) => {
         editor.insertMarkdown(markdown);
       })
       handler.on("gotoBlock", (fragment) => {
-        if (typeof fragment === 'string' && (fragment.startsWith('omnicomment:') || fragment.startsWith('markco:'))) {
+        if (typeof fragment === 'string' && fragment.startsWith('omnicomment:')) {
           const [, commentId, ...rest] = fragment.split(':');
           omniAnnotations?.focusCommentById(commentId, rest.join(':'));
           return;

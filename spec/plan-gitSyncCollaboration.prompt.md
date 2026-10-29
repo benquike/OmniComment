@@ -5,10 +5,10 @@
 **Steps**
 
 1. **Add new configuration settings** in [package.json](package.json#L93-L103)
-   - `markco.gitSync.enabled` (boolean, default: `false`) - Enable Git sync for comments
-   - `markco.gitSync.autoPush` (boolean, default: `true`) - Auto-push after commit
-   - `markco.gitSync.autoPull` (boolean, default: `true`) - Auto-pull before commit
-   - `markco.gitSync.commitMessage` (string, default: `"Markco: {action} comment"`) - Commit message template
+   - `omnicomment.gitSync.enabled` (boolean, default: `false`) - Enable Git sync for comments
+   - `omnicomment.gitSync.autoPush` (boolean, default: `true`) - Auto-push after commit
+   - `omnicomment.gitSync.autoPull` (boolean, default: `true`) - Auto-pull before commit
+   - `omnicomment.gitSync.commitMessage` (string, default: `"OmniComment: {action} comment"`) - Commit message template
 
 2. **Create new `GitSyncService`** at `src/services/GitSyncService.ts`
    - Initialize VS Code Git API via `vscode.extensions.getExtension('vscode.git')`
@@ -35,7 +35,7 @@
    - Clear after Git sync completes
 
 6. **Handle merge conflicts** in `GitSyncService`
-   - If pull results in conflict in the markco-comments block, show user message
+   - If pull results in conflict in the omnicomment comment block, show user message
    - Offer to abort (keep local) or accept (keep remote)
    - After conflict resolution, re-run `reconcileAnchors()` to update orphaned comments
 
@@ -50,7 +50,7 @@
 9. **Update documentation**
    - Add Git Sync section to [README.md](README.md) explaining the feature
    - Document settings and requirements (Git must be configured)
-   - Update [spec/Markco.md](spec/Markco.md) with new architecture component
+   - Update [spec/OmniComment.md](spec/OmniComment.md) with new architecture component
 
 **Verification**
 
@@ -60,7 +60,7 @@
    - Test conflict detection and handling
 
 2. Integration test scenario:
-   - Enable `markco.gitSync.enabled` in test workspace
+   - Enable `omnicomment.gitSync.enabled` in test workspace
    - Add a comment → verify file saves and Git operations fire
    - Simulate remote change → verify pull happens and changes merge
 

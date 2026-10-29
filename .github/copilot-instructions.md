@@ -1,4 +1,4 @@
-# Markco - Copilot Instructions
+# OmniComment - Copilot Instructions
 
 VS Code extension for adding inline comments to Markdown files. Comments are stored as JSON in HTML comment blocks within the file itself.
 
@@ -20,7 +20,7 @@ src/
 
 Comments stored at end of markdown files as:
 ```markdown
-<!-- markco-comments
+<!-- omnicomment
 {"version": 2, "comments": [...]}
 -->
 ```
@@ -50,14 +50,14 @@ Two decoration types exist: normal and focused. `setFocusedComment()` controls w
 - Changed user-facing behavior
 - Screenshots if UI changes significantly
 
-**Spec Updates**: Major architectural changes or new features should be reflected in `spec/Markco.md` to keep design documentation current.
+**Spec Updates**: Major architectural changes or new features should be reflected in `spec/OmniComment.md` to keep design documentation current.
 
 ## Development Commands
 
 ```bash
 npm run compile    # Build TypeScript
 npm run watch      # Watch mode
-npm run test       # Run all tests (41 tests)
+npm run test       # Run all tests (83 tests)
 npm run lint       # ESLint
 ```
 
@@ -76,8 +76,8 @@ Mock documents need `encoding: 'utf-8'` property. See test helpers in `CommentSe
 ## Configuration
 
 Extension settings in `package.json` under `contributes.configuration`:
-- `markco.highlightColor` - Background color for highlights
-- `markco.highlightBorderColor` - Border color for highlights
+- `omnicomment.highlightColor` - Background color for highlights
+- `omnicomment.highlightBorderColor` - Border color for highlights
 
 ## Code Fence Detection
 

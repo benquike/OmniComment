@@ -1,9 +1,20 @@
 # OmniComment Universal Integration Guide
 
-This guide covers how to integrate **OmniComment** across three primary environments:
-1. [VS Code Editors & Modes](#1-vs-code-integration)
-2. [Web Plugin for Any Website / Documentation Site](#2-web-plugin-integration)
+This guide provides an architectural overview and quick integration patterns for OmniComment. For full step-by-step guides tailored to specific platforms, consult our dedicated documentation:
+
+> 📘 **Dedicated Integration Guides**:
+> - [**VS Code Editor Modes Guide**](VSCODE_MODES_GUIDE.md) — Standard text editors, custom WYSIWYG editors, Jupyter notebooks, Git diffs, and multi-language support.
+> - [**Web App Integration Guide**](WEBAPP_GUIDE.md) — React, Next.js, Vue, Nuxt, Svelte, Web Components, and real-time backends (Supabase, WebSockets).
+> - [**Chrome Extension Guide (MV3)**](CHROME_EXTENSION_GUIDE.md) — Annotating arbitrary live websites, Shadow DOM style isolation, and cross-device sync.
+> - [**TUI & CLI Applications Guide**](TUI_APPS_GUIDE.md) — Neovim Lua plugin, Python Textual, Go Bubbletea, and Git pre-commit hooks.
+
+---
+
+## Table of Contents
+1. [VS Code Integration Overview](#1-vs-code-integration)
+2. [Web Plugin for Websites & Documentation](#2-web-plugin-integration)
 3. [Chrome Extension (Manifest V3)](#3-chrome-extension-integration)
+4. [Terminal User Interface (TUI) Integration](#4-terminal-user-interface-tui-integration)
 
 ---
 

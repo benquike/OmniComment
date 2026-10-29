@@ -19,7 +19,7 @@ This document provides the authoritative API specification for **OmniComment**, 
 
 ## 1. Core Data Types & Interfaces
 
-All data models are defined in [`src/core/types.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/core/types.ts).
+All data models are defined in [`src/core/types.ts`](../src/core/types.ts).
 
 ### `CommentAnchor`
 Defines the anchored text and its line/character coordinates within the document.
@@ -79,7 +79,7 @@ export interface OmniCommentData {
 
 ## 2. VS Code Command Reference
 
-All commands are contributed under the `omnicomment.*` namespace with backward-compatible aliases for `markco.*`, `OmniComment.*`, and `OminiComment.*`.
+All commands are contributed under the `omnicomment.*` namespace.
 
 | Command ID | Title | Description | Arguments |
 | :--- | :--- | :--- | :--- |
@@ -91,6 +91,7 @@ All commands are contributed under the `omnicomment.*` namespace with backward-c
 | `omnicomment.editorCommentAction` | In-Editor Comment Action | Dispatches actions from custom webviews | `(payload: EditorActionPayload)` |
 | `omnicomment.inlineReplyComment` | Respond | Appends reply to comment thread | `(reply: vscode.CommentReply)` |
 | `omnicomment.inlineToggleResolve` | Resolve / Reopen | Toggles resolved state on thread | `(thread: vscode.CommentThread)` |
+| `omnicomment.inlineToggleCollapseThread` | Collapse / Expand Thread | Toggles collapsed state on thread | `(thread: vscode.CommentThread)` |
 | `omnicomment.inlineDeleteThread` | Delete Comment Thread | Deletes entire thread | `(thread: vscode.CommentThread)` |
 | `omnicomment.inlineDeleteCommentItem` | Delete Comment Item | Deletes single comment or reply item | `(item: OmniCommentInlineItem)` |
 | `omnicomment.toggleCollapseAllComments` | Collapse / Expand All | Toggles height collapse for all cards | None |
@@ -179,7 +180,7 @@ interface DeleteCommentParams {
 
 ## 4. AnchorEngine API
 
-Defined in [`src/core/AnchorEngine.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/core/AnchorEngine.ts).
+Defined in [`src/core/AnchorEngine.ts`](../src/core/AnchorEngine.ts).
 
 The `AnchorEngine` implements a 3-tier matching pipeline for mapping arbitrary text queries to 0-indexed character offsets and line/character coordinates:
 
@@ -213,7 +214,7 @@ export class AnchorEngine {
 
 ## 5. Storage Adapter API
 
-Defined in [`src/storage/MarkdownStorageAdapter.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/storage/MarkdownStorageAdapter.ts).
+Defined in [`src/storage/MarkdownStorageAdapter.ts`](../src/storage/MarkdownStorageAdapter.ts).
 
 ```typescript
 export interface IStorageAdapter {
@@ -236,7 +237,7 @@ export class MarkdownStorageAdapter implements IStorageAdapter {
 
 ## 6. Web Component API (`<omni-comment>`)
 
-Defined in [`src/web/OmniCommentElement.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/web/OmniCommentElement.ts).
+Defined in [`src/web/OmniCommentElement.ts`](../src/web/OmniCommentElement.ts).
 
 ### Tag
 ```html
@@ -279,7 +280,7 @@ omni-comment {
 
 ## 7. Configuration Presets API
 
-Defined in [`src/core/Presets.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/core/Presets.ts).
+Defined in [`src/core/Presets.ts`](../src/core/Presets.ts).
 
 ```typescript
 export type PresetName =
@@ -317,7 +318,7 @@ export function getAllPresets(): PresetConfig[];
 
 ## 8. TUI Renderer API
 
-Defined in [`src/cli/tuiRenderer.ts`](file:///usr/local/google/home/phui/src/tools/editor/Markco/src/cli/tuiRenderer.ts).
+Defined in [`src/cli/tuiRenderer.ts`](../src/cli/tuiRenderer.ts).
 
 ```typescript
 export interface TuiRenderOptions {

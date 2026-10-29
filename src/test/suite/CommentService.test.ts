@@ -12,12 +12,10 @@ const test = Mocha.test;
 const setup = Mocha.setup;
 const teardown = Mocha.teardown;
 
-// Load OmniComment / Markco spec as test data
-const specPath = fs.existsSync(path.join(__dirname, '../../../spec/OmniComment.md'))
-  ? path.join(__dirname, '../../../spec/OmniComment.md')
-  : path.join(__dirname, '../../../spec/Markco.md');
+// Load OmniComment spec as test data
+const specPath = path.join(__dirname, '../../../spec/OmniComment.md');
 const specContent = fs.readFileSync(specPath, 'utf-8');
-const markcoContent = specContent;
+const omniContent = specContent;
 
 suite('CommentService Test Suite', () => {
   let commentService: CommentService;
@@ -39,8 +37,8 @@ suite('CommentService Test Suite', () => {
       assert.deepStrictEqual(comments, []);
     });
 
-    test('should parse valid comment block from Markco.md', () => {
-      const mockDocument = createMockDocument(markcoContent);
+    test('should parse valid comment block from OmniComment.md', () => {
+      const mockDocument = createMockDocument(omniContent);
       
       const comments = commentService.parseComments(mockDocument);
       
@@ -53,7 +51,7 @@ suite('CommentService Test Suite', () => {
     });
 
     test('should handle malformed JSON gracefully', () => {
-      const documentText = `# Hello\n\n<!-- markco-comments\n{invalid json}\n-->`;
+      const documentText = `# Hello\n\n<!-- omnicomment\n{invalid json}\n-->`;
       const mockDocument = createMockDocument(documentText);
       
       const comments = commentService.parseComments(mockDocument);
@@ -62,7 +60,7 @@ suite('CommentService Test Suite', () => {
     });
 
     test('should ignore comment block inside code fence', () => {
-      const documentText = `# Hello\n\n\`\`\`\n<!-- markco-comments\n{"version": 2, "comments": []}\n-->\n\`\`\``;
+      const documentText = `# Hello\n\n\`\`\`\n<!-- omnicomment\n{"version": 2, "comments": []}\n-->\n\`\`\``;
       const mockDocument = createMockDocument(documentText);
       
       const comments = commentService.parseComments(mockDocument);
@@ -83,7 +81,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Hello\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Hello\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
       
       const comments = commentService.parseComments(mockDocument);
@@ -118,8 +116,8 @@ suite('CommentService Test Suite', () => {
   });
 
   suite('getComments', () => {
-    test('should cache parsed comments from Markco.md', () => {
-      const mockDocument = createMockDocument(markcoContent);
+    test('should cache parsed comments from OmniComment.md', () => {
+      const mockDocument = createMockDocument(omniContent);
 
       // First call parses
       const comments1 = commentService.getComments(mockDocument);
@@ -134,8 +132,8 @@ suite('CommentService Test Suite', () => {
   });
 
   suite('findComment', () => {
-    test('should find comment by ID in Markco.md', () => {
-      const mockDocument = createMockDocument(markcoContent);
+    test('should find comment by ID in OmniComment.md', () => {
+      const mockDocument = createMockDocument(omniContent);
 
       const comment = commentService.findComment(mockDocument, '202ba2e2-78e6-410e-9274-33c4069fac71');
       
@@ -145,7 +143,7 @@ suite('CommentService Test Suite', () => {
     });
 
     test('should return undefined for non-existent comment', () => {
-      const mockDocument = createMockDocument(markcoContent);
+      const mockDocument = createMockDocument(omniContent);
 
       const comment = commentService.findComment(mockDocument, 'non-existent');
       
@@ -167,7 +165,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       // Cache comments
@@ -177,7 +175,7 @@ suite('CommentService Test Suite', () => {
       commentService.clearCache(mockDocument);
       
       // Create new document with different comments (simulating document change)
-      const newDocumentText = `# Test\n\n<!-- markco-comments\n{"version": 2, "comments": []}\n-->`;
+      const newDocumentText = `# Test\n\n<!-- omnicomment\n{"version": 2, "comments": []}\n-->`;
       const newMockDocument = createMockDocument(newDocumentText, mockDocument.uri.toString());
       
       // Should re-parse (cache was cleared)
@@ -208,7 +206,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       const reply = commentService.findReply(mockDocument, 'comment-1', 'reply-1');
@@ -231,7 +229,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       const reply = commentService.findReply(mockDocument, 'comment-1', 'non-existent');
@@ -273,7 +271,7 @@ suite('CommentService Test Suite', () => {
         ]
       };
       // Document where the anchor text was DELETED from content but still exists in comment block JSON
-      const documentText = `# Different text now\n\n<!-- markco-comments\n${JSON.stringify(commentData, null, 2)}\n-->`;
+      const documentText = `# Different text now\n\n<!-- omnicomment\n${JSON.stringify(commentData, null, 2)}\n-->`;
       const mockDocument = createMockDocument(documentText);
       
       // Parse and then reconcile - should mark as orphaned since text only exists in comment block
@@ -285,8 +283,8 @@ suite('CommentService Test Suite', () => {
       assert.strictEqual(comments[0].orphaned, true, 'Comment should be orphaned when anchor text only exists in comment block');
     });
 
-    test('should find anchor text that exists in Markco.md content', async () => {
-      const mockDocument = createMockDocument(markcoContent);
+    test('should find anchor text that exists in OmniComment.md content', async () => {
+      const mockDocument = createMockDocument(omniContent);
       
       commentService.parseComments(mockDocument);
       await commentService.reconcileAnchors(mockDocument);
@@ -313,7 +311,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       // Stub getGitUserName to return a consistent user
@@ -341,7 +339,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       sandbox.stub(commentService, 'getGitUserName').resolves('testuser');
@@ -374,7 +372,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       sandbox.stub(commentService, 'getGitUserName').resolves('testuser');
@@ -408,7 +406,7 @@ suite('CommentService Test Suite', () => {
           }
         ]
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       sandbox.stub(commentService, 'getGitUserName').resolves('testuser');
@@ -425,7 +423,7 @@ suite('CommentService Test Suite', () => {
         version: 2,
         comments: []
       };
-      const documentText = `# Test\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const documentText = `# Test\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const mockDocument = createMockDocument(documentText);
 
       const result = await commentService.toggleThumbsUpComment(mockDocument, 'non-existent');

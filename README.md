@@ -14,19 +14,36 @@ Universal commenting, inline highlight, and thread annotation system for editors
 - **Ready-to-Use Preset Configurations**:
   - One-click configuration switching between `documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, and `ai-agent-reviewer`.
 - **Portable & Version-Controlled Storage**:
-  - Stored directly in the document (supporting both `<!-- omnicomment` and `<!-- markco-comments` blocks) or connected to local/cloud storage backends.
+  - Stored directly in the document (in an HTML `<!-- omnicomment` block) or connected to local/cloud storage backends.
 
 ---
 
 ## Screenshots
 
-### In-Editor Comment Threads
+### 1. In-Editor Comment Threads & Sidebar Navigation
+Interactive sidebar listing active and resolved comment threads, author attributions, thumbs-up counters, two-way cursor synchronization, and gutter comment indicators.
 
-![Comment Sidebar](media/screenshot1.png)
+![Comment Sidebar & Editor Highlights](media/screenshot1.png)
 
-### Preview Highlighting
+### 2. In-Situ Dynamic Annotation Zones (WYSIWYG & TextEditor)
+Comments embed directly beneath the annotated block with resolution workflows, collapsible threaded responses, and quick reply actions.
 
-![Preview Highlighting](media/preview-screenshot.png)
+![In-Situ Inline Comment Widget](media/screenshot-inline-widget.png)
+
+### 3. Live Markdown Preview Highlighting
+In-situ highlight rendering in the VS Code Markdown preview with hover tooltips, comment count badges, and reaction indicators.
+
+![Markdown Preview Highlighting](media/preview-screenshot.png)
+
+### 4. One-Click Configuration Presets
+Quickly switch between pre-configured operational profiles via the VS Code Command Palette (`OmniComment: Apply Preset Configuration...`).
+
+![Configuration Presets](media/screenshot-presets.png)
+
+### 5. Autonomous AI Agent Review & Suggestion Diff
+Headless Agent APIs (`omnicomment.agent.*`) empower automated review agents to post structured feedback and code suggestions directly into the editor.
+
+![AI Agent Review & Suggestion Diff](media/screenshot-agent-review.png)
 
 ---
 
@@ -124,7 +141,7 @@ const result = await vscode.commands.executeCommand('omnicomment.agent.deleteCom
 
 ## Storage Specification
 
-Comments are stored directly inside the Markdown document in an HTML comment block at the end of the file. OmniComment parses both modern `<!-- omnicomment` and legacy `<!-- markco-comments` blocks seamlessly:
+Comments are stored directly inside the Markdown document in an HTML comment block at the end of the file:
 
 ```markdown
 <!-- omnicomment
@@ -155,21 +172,25 @@ Comments are stored directly inside the Markdown document in an HTML comment blo
 
 ## Documentation
 
-Comprehensive guides and tutorials are available in the [`docs/`](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/README.md) directory:
+Comprehensive guides and tutorials are available in the [`docs/`](docs/README.md) directory:
 
-- 🏠 **[Project Home Page](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/HOME.md)**: Product overview, value propositions, cross-surface feature matrix, and quickstarts.
-- 🎓 **[Hands-on Tutorial](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/TUTORIAL.md)**: Step-by-step guide from zero to hero across VS Code, presets, web embedding, browser extensions, and AI reviewer agents.
-- 📚 **[Comprehensive API Reference](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/API_REFERENCE.md)**: Formal API specification for data structures (`Comment`, `Reply`, `CommentAnchor`), commands, TypeScript core classes, and `<omni-comment>`.
-- 🤖 **[AI Agent API Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
-- 🌐 **[Integration Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into websites, blogs, documentation frameworks (Docusaurus, VitePress, Hugo), Chrome extensions, and TUI/Neovim.
-- ⚙️ **[Configuration & Presets Guide](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
-- 🏗️ **[Architecture & Data Model](file:///usr/local/google/home/phui/src/tools/editor/Markco/docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
+- 🏠 **[Project Home Page](docs/HOME.md)**: Product overview, value propositions, cross-surface feature matrix, and quickstarts.
+- 🎓 **[Hands-on Tutorial](docs/TUTORIAL.md)**: Step-by-step guide from zero to hero across VS Code, presets, web embedding, browser extensions, and AI reviewer agents.
+- 💻 **[Web Applications Guide](docs/WEBAPP_GUIDE.md)**: React, Next.js, Vue 3, Nuxt, Svelte 5, SvelteKit, Web Component (`<omni-comment>`), real-time sync (Supabase, WebSockets), and offline IndexedDB.
+- 🧩 **[Chrome Extension Guide](docs/CHROME_EXTENSION_GUIDE.md)**: Manifest V3 browser extension, live web page annotation with W3C TextQuoteSelector, Shadow DOM style isolation, and local VS Code bridge.
+- 📟 **[Terminal & TUI Apps Guide](docs/TUI_APPS_GUIDE.md)**: Headless CLI commands (`omnicomment-cli`), Neovim Lua plugin using `virt_lines` extmarks, Python Textual, Go Bubbletea, and Git pre-commit hooks.
+- 📝 **[VS Code Editor Modes Guide](docs/VSCODE_MODES_GUIDE.md)**: Standard TextEditor, Vditor WYSIWYG Custom Editor, Jupyter Notebooks (`.ipynb`), Git split/unified diff reviews, and split panes.
+- 📚 **[Comprehensive API Reference](docs/API_REFERENCE.md)**: Formal API specification for data structures (`Comment`, `Reply`, `CommentAnchor`), commands, TypeScript core classes, and `<omni-comment>`.
+- 🤖 **[AI Agent API Guide](docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
+- 🌐 **[Integration Guide](docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into static site generators (Docusaurus, VitePress, Hugo), documentation hubs, and external frameworks.
+- ⚙️ **[Configuration & Presets Guide](docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
+- 🏗️ **[Architecture & Data Model](docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
 
 ---
 
 ## Rendering the Documentation Website
 
-OmniComment includes a built-in static site generator ([`scripts/render-docs.js`](file:///usr/local/google/home/phui/src/tools/editor/Markco/scripts/render-docs.js)) that compiles the Markdown guides into a responsive documentation website featuring sidebar navigation, Prism syntax highlighting, live Mermaid diagrams, GitHub callout alerts, and an active Table of Contents.
+OmniComment includes a built-in static site generator ([`scripts/render-docs.js`](scripts/render-docs.js)) that compiles the Markdown guides into a responsive documentation website featuring sidebar navigation, Prism syntax highlighting, live Mermaid diagrams, GitHub callout alerts, and an active Table of Contents.
 
 ### 1. Build the Static Site
 ```bash

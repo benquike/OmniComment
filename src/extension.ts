@@ -19,7 +19,7 @@ let pendingInlineStateResolver: ((state: any) => void) | undefined;
 
 /**
  * Automatically ensures any installed `cweijan.vscode-office` ("Markdown Editor") extension
- * has the latest inlined comment widget assets (`omniAnnotations.js`, `markcoAnnotations.js`, `index.js`, `util.js`,
+ * has the latest inlined comment widget assets (`omniAnnotations.js`, `index.js`, `util.js`,
  * `imagePath.js`, `index.css`) synced into its `resource/markdown/` directory.
  */
 function syncMarkdownEditorIntegration(extPath: string): void {
@@ -35,7 +35,6 @@ function syncMarkdownEditorIntegration(extPath: string): void {
     }
     for (const file of [
       'omniAnnotations.js',
-      'markcoAnnotations.js',
       'index.js',
       'util.js',
       'imagePath.js',
@@ -319,15 +318,6 @@ export function activate(context: vscode.ExtensionContext) {
               comment.id,
               comment.anchor.text
             )
-            .then(
-              undefined,
-              () =>
-                vscode.commands.executeCommand(
-                  'office.markdown.focusMarkcoComment',
-                  comment.id,
-                  comment.anchor.text
-                )
-            )
             .then(undefined, () => {});
         }
       } else {
@@ -600,15 +590,6 @@ export function activate(context: vscode.ExtensionContext) {
                 comment.id,
                 comment.anchor.text
               )
-              .then(
-                undefined,
-                () =>
-                  vscode.commands.executeCommand(
-                    'office.markdown.focusMarkcoComment',
-                    comment.id,
-                    comment.anchor.text
-                  )
-              )
               .then(undefined, () => {});
           }
         }
@@ -662,7 +643,7 @@ export function activate(context: vscode.ExtensionContext) {
             // Fallback to first non-empty line in the document if no target text was specified
             for (let i = 0; i < ctx.document.lineCount; i++) {
               const line = ctx.document.lineAt(i).text.trim();
-              if (line && !line.startsWith('<!-- markco-comments') && !line.startsWith('<!-- omnicomment')) {
+              if (line && !line.startsWith('<!-- omnicomment')) {
                 anchorText = line;
                 break;
               }
@@ -799,6 +780,15 @@ export function activate(context: vscode.ExtensionContext) {
         await commentService.resolveComment(doc, commentId);
         await saveDocumentIfCustomEditor({ document: doc, editor });
         await refreshForContext(doc, editor);
+      }
+    ),
+    vscode.commands.registerCommand(
+      'omnicomment.inlineToggleCollapseThread',
+      (thread: vscode.CommentThread) => {
+        if (!thread) {
+          return;
+        }
+        inlineCommentController.toggleThreadCollapsibleState(thread);
       }
     ),
     vscode.commands.registerCommand(
@@ -1008,23 +998,17 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage(`OmniComment preset applied: ${selectedPreset}`);
   };
 
-  // Register Agent APIs under omnicomment.agent.* and markco.agent.*
+  // Register Agent APIs under omnicomment.agent.*
   context.subscriptions.push(
     vscode.commands.registerCommand('omnicomment.agent.getComments', agentGetCommentsHandler),
-    vscode.commands.registerCommand('markco.agent.getComments', agentGetCommentsHandler),
     vscode.commands.registerCommand('omnicomment.agent.postComment', agentPostCommentHandler),
-    vscode.commands.registerCommand('markco.agent.postComment', agentPostCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.replyComment', agentReplyCommentHandler),
-    vscode.commands.registerCommand('markco.agent.replyComment', agentReplyCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.resolveComment', agentResolveCommentHandler),
-    vscode.commands.registerCommand('markco.agent.resolveComment', agentResolveCommentHandler),
     vscode.commands.registerCommand('omnicomment.agent.deleteComment', agentDeleteCommentHandler),
-    vscode.commands.registerCommand('markco.agent.deleteComment', agentDeleteCommentHandler),
-    vscode.commands.registerCommand('omnicomment.applyPreset', applyPresetHandler),
-    vscode.commands.registerCommand('markco.applyPreset', applyPresetHandler)
+    vscode.commands.registerCommand('omnicomment.applyPreset', applyPresetHandler)
   );
 
-  // Register backward compatibility aliases for markco.*, OmniComment.*, and OminiComment.*
+  // Register backward compatibility aliases for OmniComment.* and OminiComment.*
   const aliasActionNames = [
     'addComment',
     'deleteComment',
@@ -1034,6 +1018,7 @@ export function activate(context: vscode.ExtensionContext) {
     'editorCommentAction',
     'inlineReplyComment',
     'inlineToggleResolve',
+    'inlineToggleCollapseThread',
     'inlineDeleteThread',
     'inlineDeleteCommentItem',
     'toggleCollapseAllComments'
@@ -1041,9 +1026,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   for (const action of aliasActionNames) {
     context.subscriptions.push(
-      vscode.commands.registerCommand(`markco.${action}`, (...args: any[]) =>
-        vscode.commands.executeCommand(`omnicomment.${action}`, ...args)
-      ),
       vscode.commands.registerCommand(`OmniComment.${action}`, (...args: any[]) =>
         vscode.commands.executeCommand(`omnicomment.${action}`, ...args)
       ),
@@ -1400,13 +1382,9 @@ export async function queryMarkdownEditorInlineStateForTesting(
       try {
         await vscode.commands.executeCommand('office.markdown.queryOmniInlineState', payload);
       } catch {
-        try {
-          await vscode.commands.executeCommand('office.markdown.queryMarkcoInlineState', payload);
-        } catch {
-          clearTimeout(timer);
-          pendingInlineStateResolver = undefined;
-          resolve(null);
-        }
+        clearTimeout(timer);
+        pendingInlineStateResolver = undefined;
+        resolve(null);
       }
     })();
   });

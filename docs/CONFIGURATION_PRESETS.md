@@ -53,8 +53,8 @@ Add the `omnicomment.preset` property to your VS Code settings:
 ```json
 {
   "omnicomment.preset": "ai-agent-reviewer",
-  "markco.highlightColor": "rgba(59, 130, 246, 0.25)",
-  "markco.highlightBorderColor": "rgba(59, 130, 246, 0.8)"
+  "omnicomment.highlightColor": "rgba(59, 130, 246, 0.25)",
+  "omnicomment.highlightBorderColor": "rgba(59, 130, 246, 0.8)"
 }
 ```
 
@@ -163,7 +163,7 @@ OmniComment supports pluggable storage drivers via the `IStorageAdapter` interfa
 
 ### Markdown In-File Storage
 
-Comments are stored directly inside the Markdown document in an HTML comment block at the end of the file. OmniComment parses both modern `<!-- omnicomment` and legacy `<!-- markco-comments` blocks:
+Comments are stored directly inside the Markdown document in an HTML comment block at the end of the file:
 
 ```markdown
 <!-- omnicomment

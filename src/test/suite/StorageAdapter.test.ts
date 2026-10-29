@@ -33,25 +33,25 @@ suite('StorageAdapter Test Suite', () => {
       assert.strictEqual(comments[0].author, 'OmniAgent');
     });
 
-    test('should parse comments from legacy <!-- markco-comments block', () => {
+    test('should parse comments from <!-- omnicomment block with different whitespace', () => {
       const commentData = {
         version: 2,
         comments: [
           {
-            id: 'legacy-123',
+            id: 'sample-123',
             anchor: { text: 'Hello', startLine: 0, startChar: 0, endLine: 0, endChar: 5 },
-            content: 'Legacy markco comment',
+            content: 'Sample omnicomment comment',
             author: 'OldUser',
             createdAt: '2026-01-01T00:00:00.000Z'
           }
         ]
       };
-      const text = `# Title\n\n<!-- markco-comments\n${JSON.stringify(commentData)}\n-->`;
+      const text = `# Title\n\n<!-- omnicomment\n${JSON.stringify(commentData)}\n-->`;
       const comments = adapter.parseCommentsFromText(text);
 
       assert.strictEqual(comments.length, 1);
-      assert.strictEqual(comments[0].id, 'legacy-123');
-      assert.strictEqual(comments[0].content, 'Legacy markco comment');
+      assert.strictEqual(comments[0].id, 'sample-123');
+      assert.strictEqual(comments[0].content, 'Sample omnicomment comment');
     });
 
     test('should append modern <!-- omnicomment block when no block exists', () => {
@@ -72,7 +72,7 @@ suite('StorageAdapter Test Suite', () => {
     });
 
     test('should preserve existing marker when updating an existing block', () => {
-      const initial = `# Doc\n\n<!-- markco-comments\n{"version": 2, "comments": []}\n-->`;
+      const initial = `# Doc\n\n<!-- omnicomment\n{"version": 2, "comments": []}\n-->`;
       const sampleComments: Comment[] = [
         {
           id: 'test-2',
@@ -84,7 +84,7 @@ suite('StorageAdapter Test Suite', () => {
       ];
 
       const updated = adapter.formatUpdatedText(initial, sampleComments);
-      assert.ok(updated.includes('<!-- markco-comments'));
+      assert.ok(updated.includes('<!-- omnicomment'));
       assert.ok(updated.includes('"id": "test-2"'));
     });
   });

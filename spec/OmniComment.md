@@ -64,11 +64,11 @@ flowchart TB
 1. **Initialize extension project structure** with:
    - [package.json](package.json) - Extension manifest with `views`, `viewsContainers`, commands, activation events
    - [src/extension.ts](src/extension.ts) - Main activation, register providers and commands
-   - Commands: `markco.addComment`, `markco.deleteComment`, `markco.editComment`, `markco.toggleSidebar`, `markco.navigateToComment`
+   - Commands: `omnicomment.addComment`, `omnicomment.deleteComment`, `omnicomment.editComment`, `omnicomment.toggleSidebar`, `omnicomment.navigateToComment`
    - Activation: `onLanguage:markdown`
 
 2. **Create CommentService** in [src/services/CommentService.ts](src/services/CommentService.ts):
-   - `parseComments(document)` - Extract JSON from `<!-- markco-comments ... -->` block
+   - `parseComments(document)` - Extract JSON from `<!-- omnicomment ... -->` block
    - `saveComments(document, comments)` - Serialize and write JSON block to end of file
    - `addComment(document, selection, content)` - Create new comment with anchor
    - `deleteComment(document, commentId)` - Remove comment by ID (cascade deletes replies)
@@ -105,7 +105,7 @@ flowchart TB
 
 5. **Implement two-way navigation**:
    - Sidebar → Editor: On comment click, use `editor.revealRange()` + flash decoration
-   - Editor → Sidebar: On text selection, command `markco.addComment` opens sidebar form (auto-selects word/line if no selection)
+   - Editor → Sidebar: On text selection, command `omnicomment.addComment` opens sidebar form (auto-selects word/line if no selection)
    - Use `vscode.commands.executeCommand` for cross-component communication
 
 6. **Wire up event listeners** in [src/extension.ts](src/extension.ts):
@@ -118,7 +118,7 @@ flowchart TB
 Comments are stored as a JSON block at the end of the Markdown file, wrapped in an HTML comment to remain invisible when rendered:
 
 ```markdown
-<!-- markco-comments
+<!-- omnicomment
 {
   "version": 2,
   "comments": [
@@ -178,7 +178,7 @@ Comments and replies support thumbs up reactions to indicate agreement or acknow
 ### File Structure
 
 ```ascii
-markco/
+omnicomment/
 ├── package.json
 ├── tsconfig.json
 ├── src/
@@ -191,16 +191,16 @@ markco/
 │   ├── providers/
 │   │   └── CommentSidebarProvider.ts  # WebviewViewProvider with 12 callback parameters
 │   ├── markdown/
-│   │   └── markcoPreviewPlugin.ts    # markdown-it plugin for preview highlighting
+│   │   └── omniCommentPreviewPlugin.ts    # markdown-it plugin for preview highlighting
 │   └── test/
 │       └── suite/                # Test files for all components
 └── media/
     ├── sidebar.css               # Sidebar styling
     ├── preview.css               # Preview highlighting styles
-    └── markco.png                # Extension icon
+    └── omnicomment.png           # Extension icon
 ```
 
-<!-- markco-comments
+<!-- omnicomment
 {
   "version": 2,
   "comments": [
@@ -241,7 +241,7 @@ markco/
         "endLine": 33,
         "endChar": 30
       },
-      "content": "Is this the right place to add the configuration and settings for Marcko?",
+      "content": "Is this the right place to add the configuration and settings for OmniComment?",
       "author": "Oren Maoz",
       "createdAt": "2026-01-22T11:29:21.246Z"
     },

@@ -334,3 +334,15 @@ You now have a complete end-to-end understanding of OmniComment:
 - Annotating arbitrary web pages with the Chrome extension.
 - Inspecting comments in terminal TUI environments.
 - Building autonomous AI agents that collaborate on documents.
+
+---
+
+## Where to Go From Here: Dedicated Surface Guides
+
+To build deeper production integrations on specific surfaces, explore our dedicated guides:
+
+- 💻 **[Web Applications Integration Guide](WEBAPP_GUIDE.md)**: Production-ready setups for React, Next.js, Vue 3, Nuxt, Svelte 5, SvelteKit, Web Component lifecycle, real-time sync (Supabase, WebSockets), and offline IndexedDB caching.
+- 🧩 **[Chrome Extension Deep Dive Guide](CHROME_EXTENSION_GUIDE.md)**: Manifest V3 extension architecture, live DOM annotation with W3C `TextQuoteSelector`, Shadow DOM CSS style isolation, cross-device sync, and local VS Code bridge.
+- 📟 **[Terminal & TUI Apps Guide](TUI_APPS_GUIDE.md)**: Headless CLI commands (`omnicomment-cli`), Neovim Lua plugin using `virt_lines` extmarks, Python Textual app, Go Bubbletea UI, and automated Git pre-commit hooks.
+- 📝 **[VS Code Editor Modes Guide](VSCODE_MODES_GUIDE.md)**: Deep dive into all VS Code editor surfaces: Standard TextEditor, Vditor WYSIWYG Custom Editor, Jupyter Notebooks (`.ipynb`), Git split/unified diff reviews, and split-pane synchronization.
+- 📚 **[Comprehensive API Reference](API_REFERENCE.md)**: Complete formal data model specifications, methods, and command definitions.

@@ -1,10 +1,10 @@
 ---
 name: testing
-description: Guide for creating and running tests in the Markco VS Code extension
+description: Guide for creating and running tests in the OmniComment VS Code extension
 ---
 # Test Creation and Running Skill
 
-This skill provides guidance for creating and running tests in the Markco VS Code extension.
+This skill provides guidance for creating and running tests in the OmniComment VS Code extension.
 
 ## Project Test Structure
 

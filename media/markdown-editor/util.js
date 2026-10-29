@@ -274,7 +274,7 @@ const getCursorOrSelectedPlainText = () => {
 
 const triggerAddComment = async (fallbackText = '') => {
     const text = (getCursorOrSelectedPlainText() || fallbackText || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
-    const openAddComment = window.__omniOpenAddComment || window.__markcoOpenAddComment
+    const openAddComment = window.__omniOpenAddComment;
     if (typeof openAddComment === 'function') {
         openAddComment(text)
         return

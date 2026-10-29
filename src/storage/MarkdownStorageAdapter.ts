@@ -2,7 +2,6 @@ import { Comment, CommentData } from '../core/types';
 import { IStorageAdapter } from './IStorageAdapter';
 
 export const OMNI_COMMENT_MARKER = '<!-- omnicomment';
-export const LEGACY_MARKCO_MARKER = '<!-- markco-comments';
 export const COMMENT_BLOCK_END = '-->';
 export const CURRENT_SCHEMA_VERSION = 2;
 
@@ -69,10 +68,10 @@ export class MarkdownStorageAdapter implements IStorageAdapter {
 
   /**
    * Finds the actual comment block position, searching backwards from the end of the text.
-   * Recognizes both `<!-- omnicomment` and `<!-- markco-comments`.
+   * Recognizes `<!-- omnicomment`.
    */
   public static findCommentBlock(text: string): CommentBlockLocation | null {
-    const markers = [OMNI_COMMENT_MARKER, LEGACY_MARKCO_MARKER];
+    const markers = [OMNI_COMMENT_MARKER];
     let latestIndex = -1;
     let latestMarker = '';
 

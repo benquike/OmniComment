@@ -19,8 +19,8 @@ suite('Extension Test Suite', () => {
   suite('Extension Activation', () => {
     test('Extension should be present', () => {
       const extension =
-        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
-        vscode.extensions.getExtension('OrenMaoz.markco');
+        vscode.extensions.getExtension('benquike.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.omnicomment');
       // Extension may not be installed in test environment, just check API works
       assert.ok(true, 'Extension API is accessible');
     });
@@ -29,8 +29,8 @@ suite('Extension Test Suite', () => {
       // Get all registered commands
       const commands = await vscode.commands.getCommands(true);
       
-      // Check that OmniComment / Markco commands are registered when extension is active
-      const omniCommands = commands.filter(cmd => cmd.startsWith('omnicomment.') || cmd.startsWith('markco.'));
+      // Check that OmniComment commands are registered when extension is active
+      const omniCommands = commands.filter(cmd => cmd.startsWith('omnicomment.'));
       
       // If extension is active, commands should be registered
       // Note: In test environment, extension may not auto-activate
@@ -74,8 +74,8 @@ suite('Extension Test Suite', () => {
 
     test('Package contribution contexts should include skill language', () => {
       const extension =
-        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
-        vscode.extensions.getExtension('OrenMaoz.markco');
+        vscode.extensions.getExtension('benquike.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.omnicomment');
       const extensionPath = extension?.extensionPath ?? path.resolve(__dirname, '../../..');
       const packageJsonPath = path.join(extensionPath, 'package.json');
       assert.ok(fs.existsSync(packageJsonPath), `package.json not found at ${packageJsonPath}`);
@@ -85,13 +85,13 @@ suite('Extension Test Suite', () => {
       assert.ok(packageJson.activationEvents.includes('onLanguage:skill'));
 
       const editorContextMenuItem = packageJson.contributes.menus['editor/context'].find(
-        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment'
       );
       const editorTitleMenuItem = packageJson.contributes.menus['editor/title'].find(
-        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment'
       );
       const keybindingItem = packageJson.contributes.keybindings.find(
-        (item: { command: string }) => item.command === 'omnicomment.addComment' || item.command === 'markco.addComment'
+        (item: { command: string }) => item.command === 'omnicomment.addComment'
       );
 
       assert.ok(editorContextMenuItem);
@@ -166,10 +166,10 @@ suite('Extension Test Suite', () => {
 
   suite('Comment Block Format', () => {
     test('Should recognize comment block structure', () => {
-      const COMMENT_BLOCK_START = '<!-- markco-comments';
+      const COMMENT_BLOCK_START = '<!-- omnicomment';
       const COMMENT_BLOCK_END = '-->';
       
-      const validBlock = `<!-- markco-comments
+      const validBlock = `<!-- omnicomment
 {
   "version": 2,
   "comments": []
@@ -211,18 +211,17 @@ suite('Extension Test Suite', () => {
   suite('Webview Provider', () => {
     test('Should have valid view type', () => {
       const viewType = CommentSidebarProvider.viewType;
-      assert.ok(viewType.startsWith('omnicomment.') || viewType.startsWith('markco.'));
+      assert.strictEqual(viewType, 'omnicomment.commentSidebar');
     });
   });
 
   suite('Configuration', () => {
     test('Should access configuration values', () => {
       const config = vscode.workspace.getConfiguration('omnicomment');
-      const legacyConfig = vscode.workspace.getConfiguration('markco');
       
       // Get default values or configured values
-      const highlightColor = config.get<string>('highlightColor') || legacyConfig.get<string>('highlightColor');
-      const highlightBorderColor = config.get<string>('highlightBorderColor') || legacyConfig.get<string>('highlightBorderColor');
+      const highlightColor = config.get<string>('highlightColor');
+      const highlightBorderColor = config.get<string>('highlightBorderColor');
       
       // Values may be undefined if extension not active, but API should work
       assert.ok(config !== undefined, 'Configuration object is accessible');
@@ -345,8 +344,8 @@ suite('Extension Test Suite', () => {
   suite('OmniComment Branding & Agent API Contributions', () => {
     test('Package should contribute OmniComment branding, presets, and agent commands', () => {
       const extension =
-        vscode.extensions.getExtension('OrenMaoz.omnicomment') ||
-        vscode.extensions.getExtension('OrenMaoz.markco');
+        vscode.extensions.getExtension('benquike.omnicomment') ||
+        vscode.extensions.getExtension('OrenMaoz.omnicomment');
       const extensionPath = extension?.extensionPath ?? path.resolve(__dirname, '../../..');
       const packageJsonPath = path.join(extensionPath, 'package.json');
       assert.ok(fs.existsSync(packageJsonPath), `package.json not found at ${packageJsonPath}`);
@@ -384,7 +383,7 @@ suite('Extension Test Suite', () => {
       );
 
       // Check contributed Agent API commands
-      const commands: Array<{ command: string; category: string }> = packageJson.contributes.commands;
+      const commands: Array<{ command: string; category: string; icon?: string }> = packageJson.contributes.commands;
       const commandNames = commands.map(c => c.command);
       assert.ok(commandNames.includes('omnicomment.applyPreset'), 'omnicomment.applyPreset command missing');
       assert.ok(commandNames.includes('omnicomment.agent.getComments'), 'agent.getComments command missing');
@@ -392,6 +391,21 @@ suite('Extension Test Suite', () => {
       assert.ok(commandNames.includes('omnicomment.agent.replyComment'), 'agent.replyComment command missing');
       assert.ok(commandNames.includes('omnicomment.agent.resolveComment'), 'agent.resolveComment command missing');
       assert.ok(commandNames.includes('omnicomment.agent.deleteComment'), 'agent.deleteComment command missing');
+
+      // Check distinct icons for collapse thread and delete thread (no icon collision)
+      const collapseCmd = commands.find(c => c.command === 'omnicomment.inlineToggleCollapseThread');
+      const deleteThreadCmd = commands.find(c => c.command === 'omnicomment.inlineDeleteThread');
+      assert.ok(collapseCmd, 'omnicomment.inlineToggleCollapseThread command missing');
+      assert.ok(deleteThreadCmd, 'omnicomment.inlineDeleteThread command missing');
+      assert.strictEqual(collapseCmd?.icon, '$(chevron-up)', 'Collapse command must use chevron icon');
+      assert.strictEqual(deleteThreadCmd?.icon, '$(trash)', 'Delete command must use trash icon');
+      assert.notStrictEqual(collapseCmd?.icon, deleteThreadCmd?.icon, 'Collapse and delete commands must have distinct icons');
+
+      // Check comments/commentThread/title menu contributions
+      const threadTitleMenus: Array<{ command: string; group?: string }> =
+        packageJson.contributes.menus['comments/commentThread/title'];
+      assert.ok(threadTitleMenus.some(m => m.command === 'omnicomment.inlineToggleCollapseThread' && m.group === 'navigation@2'));
+      assert.ok(threadTitleMenus.some(m => m.command === 'omnicomment.inlineDeleteThread' && m.group === 'navigation@3'));
 
       // Check category
       const agentCmd = commands.find(c => c.command === 'omnicomment.agent.getComments');

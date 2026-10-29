@@ -73,6 +73,12 @@
         "icon": "$(check)"
       },
       {
+        "command": "omnicomment.inlineToggleCollapseThread",
+        "title": "Collapse / Expand Comment Thread",
+        "category": "OmniComment",
+        "icon": "$(chevron-up)"
+      },
+      {
         "command": "omnicomment.inlineDeleteThread",
         "title": "Delete Comment Thread",
         "category": "OmniComment",
@@ -156,9 +162,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "omnicomment.inlineDeleteThread",
+          "command": "omnicomment.inlineToggleCollapseThread",
           "when": "commentController == omnicomment-inline || commentController == markco-inline",
           "group": "navigation@2"
+        },
+        {
+          "command": "omnicomment.inlineDeleteThread",
+          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "group": "navigation@3"
         }
       ],
       "comments/comment/title": [
@@ -202,16 +213,6 @@
           "type": "string",
           "default": "rgba(255, 212, 0, 0.8)",
           "description": "Border color for comment highlights"
-        },
-        "markco.highlightColor": {
-          "type": "string",
-          "default": "rgba(255, 212, 0, 0.3)",
-          "description": "Legacy background color for comment highlights (deprecated, use omnicomment.highlightColor)"
-        },
-        "markco.highlightBorderColor": {
-          "type": "string",
-          "default": "rgba(255, 212, 0, 0.8)",
-          "description": "Legacy border color for comment highlights (deprecated, use omnicomment.highlightBorderColor)"
         }
       }
     },

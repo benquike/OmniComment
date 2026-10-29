@@ -1,5 +1,4 @@
 const OMNI_COMMENT_BLOCK_START = '<!-- omnicomment';
-const LEGACY_MARKCO_COMMENT_BLOCK_START = '<!-- markco-comments';
 const COMMENT_BLOCK_START = OMNI_COMMENT_BLOCK_START;
 const COMMENT_BLOCK_END = '-->';
 
@@ -42,14 +41,8 @@ function findCommentBlockSpan(markdown) {
   if (!markdown || typeof markdown !== 'string') {
     return null;
   }
-  const omniIdx = markdown.lastIndexOf(OMNI_COMMENT_BLOCK_START);
-  const legacyIdx = markdown.lastIndexOf(LEGACY_MARKCO_COMMENT_BLOCK_START);
-  let startIdx = omniIdx;
-  let activeMarker = OMNI_COMMENT_BLOCK_START;
-  if (legacyIdx > omniIdx) {
-    startIdx = legacyIdx;
-    activeMarker = LEGACY_MARKCO_COMMENT_BLOCK_START;
-  }
+  const startIdx = markdown.lastIndexOf(OMNI_COMMENT_BLOCK_START);
+  const activeMarker = OMNI_COMMENT_BLOCK_START;
   if (startIdx === -1) {
     return null;
   }
@@ -323,10 +316,10 @@ function hideStorageBlocks(root) {
   const blocks = root.querySelectorAll('[data-type="html-block"]');
   for (const block of blocks) {
     const text = block.textContent || '';
-    if (text.includes(OMNI_COMMENT_BLOCK_START) || text.includes(LEGACY_MARKCO_COMMENT_BLOCK_START)) {
-      block.classList.add('omni-storage-block', 'markco-storage-block');
+    if (text.includes(OMNI_COMMENT_BLOCK_START)) {
+      block.classList.add('omni-storage-block');
     } else {
-      block.classList.remove('omni-storage-block', 'markco-storage-block');
+      block.classList.remove('omni-storage-block');
     }
   }
 }
@@ -363,7 +356,7 @@ function buildDomTextMap(container) {
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (
           parent.closest(
-            '.markco-storage-block, .vditor-wysiwyg__pre, .vditor-ir__marker, .vditor-toolbar, .vditor-outline, .vditor-hint, .markco-inline-zones-layer, .markco-selection-chip, script, style'
+            '.vditor-wysiwyg__pre, .vditor-ir__marker, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
           )
         ) {
           return NodeFilter.FILTER_REJECT;
@@ -466,8 +459,7 @@ export function initOmniAnnotations(getMarkdownValue) {
 
   // Hook into imagePath.js restoreWorkspaceBaseUrls so Vditor's getValue() and input() always preserve the latest comments block
   window.__omniSyncMarkdownBlock = function (md) {
-    window.__markcoSyncMarkdownBlock = window.__omniSyncMarkdownBlock;
-    if (typeof md !== 'string') return md;
+        if (typeof md !== 'string') return md;
     if (!latestSerializedBlock) return md;
     return replaceOrAppendCommentsBlock(md, latestSerializedBlock);
   };
@@ -594,26 +586,26 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   // 1. Dynamic stylesheet in <head> that reserves exact vertical space (margin-bottom) beneath commented blocks
-  let zoneStyleEl = document.getElementById('markco-zone-styles');
+  let zoneStyleEl = document.getElementById('omni-zone-styles');
   if (!zoneStyleEl) {
     zoneStyleEl = document.createElement('style');
-    zoneStyleEl.id = 'markco-zone-styles';
+    zoneStyleEl.id = 'omni-zone-styles';
     document.head.appendChild(zoneStyleEl);
   }
 
   // 2. Inline Zones Overlay Layer (scroll-locked & clipped to the Markdown viewport, outside contenteditable)
-  let zonesLayer = document.getElementById('markco-inline-zones-layer');
+  let zonesLayer = document.getElementById('omni-inline-zones-layer');
   if (!zonesLayer) {
     zonesLayer = document.createElement('div');
-    zonesLayer.id = 'markco-inline-zones-layer';
-    zonesLayer.className = 'markco-inline-zones-layer';
+    zonesLayer.id = 'omni-inline-zones-layer';
+    zonesLayer.className = 'omni-inline-zones-layer';
     document.body.appendChild(zonesLayer);
   }
 
   // 3. Floating Selection "💬 Comment" Chip on text selection
   const selectionChip = document.createElement('button');
   selectionChip.type = 'button';
-  selectionChip.className = 'markco-selection-chip';
+  selectionChip.className = 'omni-selection-chip';
   selectionChip.hidden = true;
   selectionChip.innerHTML = '💬 Comment';
   selectionChip.addEventListener('mousedown', e => {
@@ -662,7 +654,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     }
     if (selection.anchorNode && contentRoot.contains(selection.anchorNode)) {
       const blockEl = resolveBlockElement(selection.anchorNode, contentRoot);
-      if (blockEl && !blockEl.classList.contains('markco-storage-block')) {
+      if (blockEl && !blockEl.classList.contains('omni-storage-block')) {
         const text = (blockEl.textContent || '')
           .replace(/[\u200B-\u200D\uFEFF]/g, '')
           .replace(/\u00A0/g, ' ')
@@ -688,7 +680,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       }
     }
     return contentRoot.querySelector(
-      'p:not(.markco-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
     );
   }
 
@@ -711,8 +703,8 @@ export function initOmniAnnotations(getMarkdownValue) {
 
     renderInlineZones();
     setTimeout(() => {
-      const textarea = zonesLayer.querySelector('#markco-inline-new-comment-input');
-      const anchorInput = zonesLayer.querySelector('#markco-inline-new-comment-anchor');
+      const textarea = zonesLayer.querySelector('#omni-inline-new-comment-input');
+      const anchorInput = zonesLayer.querySelector('#omni-inline-new-comment-anchor');
       if (candidate && textarea) {
         textarea.focus();
       } else if (anchorInput) {
@@ -725,8 +717,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   window.__omniOpenAddComment = openAddCommentComposer;
-  window.__markcoOpenAddComment = openAddCommentComposer;
-
+  
   function syncZonePositions() {
     const root = document.getElementById('vditor');
     const contentRoot = getContentRoot();
@@ -759,7 +750,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       cssRules.push(
-        `[data-markco-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 18}px !important; }`
+        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 18}px !important; }`
       );
     }
 
@@ -785,7 +776,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       zoneEl.style.left = `${left}px`;
       zoneEl.style.width = `${width}px`;
 
-      const arrowEl = zoneEl.querySelector('.markco-inline-zone__arrow');
+      const arrowEl = zoneEl.querySelector('.omni-inline-zone__arrow');
       if (arrowEl) {
         let arrowOffset = 24;
         if (anchorRange) {
@@ -816,54 +807,54 @@ export function initOmniAnnotations(getMarkdownValue) {
     const thumbsCount = (comment.thumbsUp || []).length;
 
     return `
-      <div class="omni-inline-thread markco-inline-thread ${isFocused ? 'is-focused' : ''} ${
+      <div class="omni-inline-thread  ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
     }" data-comment-id="${escapeHtml(comment.id)}">
-        <div class="omni-inline-thread omni-inline-thread__header markco-inline-thread__header">
-          <div class="omni-inline-thread omni-inline-thread__header-left markco-inline-thread__header-left">
-            <span class="omni-inline-thread omni-inline-thread__status markco-inline-thread__status ${
+        <div class="omni-inline-thread omni-inline-thread__header ">
+          <div class="omni-inline-thread omni-inline-thread__header-left ">
+            <span class="omni-inline-thread omni-inline-thread__status  ${
               comment.resolved ? 'is-resolved' : 'is-unresolved'
             }">${statusLabel}</span>
-            <span class="omni-inline-thread omni-inline-thread__anchor-pill markco-inline-thread__anchor-pill" title="Anchored on ${escapeHtml(
+            <span class="omni-inline-thread omni-inline-thread__anchor-pill " title="Anchored on ${escapeHtml(
               lineLabel
             )}: &quot;${escapeHtml(comment.anchor?.text || '')}&quot;">
               "${escapeHtml(comment.anchor?.text || '')}"
             </span>
           </div>
-          <div class="omni-inline-thread omni-inline-thread__header-actions markco-inline-thread__header-actions">
-            <button type="button" class="omni-inline-header-btn markco-inline-header-btn" data-action="toggle-resolve" data-comment-id="${escapeHtml(
+          <div class="omni-inline-thread omni-inline-thread__header-actions ">
+            <button type="button" class="omni-inline-header-btn " data-action="toggle-resolve" data-comment-id="${escapeHtml(
               comment.id
             )}" title="${comment.resolved ? 'Reopen comment' : 'Resolve comment'}">
-              ${comment.resolved ? '↺' : '⊟'}
+              <i class="codicon codicon-${comment.resolved ? 'issue-reopened' : 'check'}"></i>
             </button>
-            <button type="button" class="omni-inline-header-btn markco-inline-header-btn is-danger" data-action="delete-comment" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn is-danger" data-action="delete-comment" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Delete comment thread">
-              🗑
+              <i class="codicon codicon-trash"></i>
             </button>
-            <button type="button" class="omni-inline-header-btn markco-inline-header-btn omni-collapse-chevron markco-collapse-chevron" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn omni-collapse-chevron " data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Collapse comment">
-              ⌃
+              <i class="codicon codicon-chevron-up"></i>
             </button>
           </div>
         </div>
 
-        <div class="omni-inline-thread omni-inline-thread__body markco-inline-thread__body">
+        <div class="omni-inline-thread omni-inline-thread__body ">
             <!-- Root Comment -->
-            <div class="omni-inline-item markco-inline-item omni-inline-item--root markco-inline-item--root">
-              <div class="omni-inline-item omni-inline-item__meta markco-inline-item__meta">
-                <span class="omni-inline-item omni-inline-item__author markco-inline-item__author">${escapeHtml(comment.author)}</span>
-                <span class="omni-inline-item omni-inline-item__time markco-inline-item__time">${escapeHtml(
+            <div class="omni-inline-item omni-inline-item--root ">
+              <div class="omni-inline-item omni-inline-item__meta ">
+                <span class="omni-inline-item omni-inline-item__author ">${escapeHtml(comment.author)}</span>
+                <span class="omni-inline-item omni-inline-item__time ">${escapeHtml(
                   formatRelativeTime(comment.createdAt)
                 )}</span>
-                <div class="omni-inline-item omni-inline-item__actions markco-inline-item__actions">
-                  <button type="button" class="omni-inline-item omni-inline-item-btn markco-inline-item-btn" data-action="thumbs-up" data-comment-id="${escapeHtml(
+                <div class="omni-inline-item omni-inline-item__actions ">
+                  <button type="button" class="omni-inline-item omni-inline-item-btn " data-action="thumbs-up" data-comment-id="${escapeHtml(
                     comment.id
                   )}" title="Thumbs up">
                     👍${thumbsCount > 0 ? ` ${thumbsCount}` : ''}
                   </button>
-                  <button type="button" class="omni-inline-item omni-inline-item-btn markco-inline-item-btn" data-action="start-edit" data-comment-id="${escapeHtml(
+                  <button type="button" class="omni-inline-item omni-inline-item-btn " data-action="start-edit" data-comment-id="${escapeHtml(
                     comment.id
                   )}" title="Edit comment">
                     Edit
@@ -873,23 +864,23 @@ export function initOmniAnnotations(getMarkdownValue) {
               ${
                 isEditing
                   ? `
-                <div class="omni-inline-edit-box markco-inline-edit-box">
-                  <textarea id="markco-edit-input-${escapeHtml(
+                <div class="omni-inline-edit-box ">
+                  <textarea id="omni-edit-input-${escapeHtml(
                     comment.id
-                  )}" class="omni-inline-textarea markco-inline-textarea" rows="3">${escapeHtml(
+                  )}" class="omni-inline-textarea " rows="3">${escapeHtml(
                       comment.content
                     )}</textarea>
-                  <div class="omni-inline-form-actions markco-inline-form-actions">
-                    <button type="button" class="omni-inline-btn markco-inline-btn is-secondary" data-action="cancel-edit" data-comment-id="${escapeHtml(
+                  <div class="omni-inline-form-actions ">
+                    <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-edit" data-comment-id="${escapeHtml(
                       comment.id
                     )}">Cancel</button>
-                    <button type="button" class="omni-inline-btn markco-inline-btn is-primary" data-action="save-edit" data-comment-id="${escapeHtml(
+                    <button type="button" class="omni-inline-btn is-primary" data-action="save-edit" data-comment-id="${escapeHtml(
                       comment.id
                     )}">Save</button>
                   </div>
                 </div>
               `
-                  : `<div class="omni-inline-item omni-inline-item__text markco-inline-item__text">${escapeHtml(
+                  : `<div class="omni-inline-item omni-inline-item__text ">${escapeHtml(
                       comment.content
                     )}</div>`
               }
@@ -899,8 +890,8 @@ export function initOmniAnnotations(getMarkdownValue) {
             ${
               replies.length > 0
                 ? `
-              <div class="omni-inline-replies-section markco-inline-replies-section">
-                <button type="button" class="omni-inline-replies-toggle markco-inline-replies-toggle" data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
+              <div class="omni-inline-replies-section ">
+                <button type="button" class="omni-inline-replies-toggle " data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
                   ${areRepliesCollapsed ? '▸ Show' : '▾ Hide'} ${replies.length} ${
@@ -911,29 +902,29 @@ export function initOmniAnnotations(getMarkdownValue) {
                   areRepliesCollapsed
                     ? ''
                     : `
-                  <div class="omni-inline-replies-list markco-inline-replies-list">
+                  <div class="omni-inline-replies-list ">
                     ${replies
                       .map(
                         r => `
-                      <div class="omni-inline-item markco-inline-item omni-inline-item--reply markco-inline-item--reply" data-reply-id="${escapeHtml(
+                      <div class="omni-inline-item omni-inline-item--reply " data-reply-id="${escapeHtml(
                         r.id
                       )}">
-                        <div class="omni-inline-item omni-inline-item__meta markco-inline-item__meta">
-                          <span class="omni-inline-item omni-inline-item__author markco-inline-item__author">${escapeHtml(
+                        <div class="omni-inline-item omni-inline-item__meta ">
+                          <span class="omni-inline-item omni-inline-item__author ">${escapeHtml(
                             r.author
                           )}</span>
-                          <span class="omni-inline-item omni-inline-item__time markco-inline-item__time">${escapeHtml(
+                          <span class="omni-inline-item omni-inline-item__time ">${escapeHtml(
                             formatRelativeTime(r.createdAt)
                           )}</span>
-                          <div class="omni-inline-item omni-inline-item__actions markco-inline-item__actions">
-                            <button type="button" class="omni-inline-item omni-inline-item-btn markco-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
+                          <div class="omni-inline-item omni-inline-item__actions ">
+                            <button type="button" class="omni-inline-item omni-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
                               comment.id
                             )}" data-reply-id="${escapeHtml(
                               r.id
-                            )}" title="Delete response">✕</button>
+                            )}" title="Delete response"><i class="codicon codicon-trash"></i></button>
                           </div>
                         </div>
-                        <div class="omni-inline-item omni-inline-item__text markco-inline-item__text">${escapeHtml(r.content)}</div>
+                        <div class="omni-inline-item omni-inline-item__text ">${escapeHtml(r.content)}</div>
                       </div>
                     `
                       )
@@ -947,28 +938,28 @@ export function initOmniAnnotations(getMarkdownValue) {
             }
 
             <!-- Inline Reply... Box (matching screenshots/inline-comment.png) -->
-            <div class="omni-inline-reply-container markco-inline-reply-container" data-reply-container="${escapeHtml(
+            <div class="omni-inline-reply-container " data-reply-container="${escapeHtml(
               comment.id
             )}">
               <textarea
-                id="markco-reply-input-${escapeHtml(comment.id)}"
-                class="omni-inline-reply-input markco-inline-reply-input"
+                id="omni-reply-input-${escapeHtml(comment.id)}"
+                class="omni-inline-reply-input "
                 rows="1"
                 data-comment-id="${escapeHtml(comment.id)}"
                 placeholder="Reply..."
               ></textarea>
-              <div class="omni-inline-reply-actions markco-inline-reply-actions">
-                <button type="button" class="omni-inline-btn markco-inline-btn is-secondary" data-action="toggle-resolve" data-comment-id="${escapeHtml(
+              <div class="omni-inline-reply-actions ">
+                <button type="button" class="omni-inline-btn is-secondary" data-action="toggle-resolve" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
                   ${comment.resolved ? 'Reopen' : 'Resolve'}
                 </button>
-                <button type="button" class="omni-inline-btn markco-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
+                <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
                   Cancel
                 </button>
-                <button type="button" class="omni-inline-btn markco-inline-btn is-primary" data-action="submit-reply" data-comment-id="${escapeHtml(
+                <button type="button" class="omni-inline-btn is-primary" data-action="submit-reply" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
                   Reply
@@ -983,44 +974,44 @@ export function initOmniAnnotations(getMarkdownValue) {
 
   function renderNewCommentDraftHtml(draft) {
     return `
-      <div class="omni-inline-thread markco-inline-thread omni-inline-new-comment markco-inline-new-comment is-focused">
-        <div class="omni-inline-thread omni-inline-thread__header markco-inline-thread__header">
-          <div class="omni-inline-thread omni-inline-thread__header-left markco-inline-thread__header-left">
-            <span class="omni-inline-thread omni-inline-thread__status markco-inline-thread__status is-unresolved">New Comment</span>
+      <div class="omni-inline-thread omni-inline-new-comment is-focused">
+        <div class="omni-inline-thread omni-inline-thread__header ">
+          <div class="omni-inline-thread omni-inline-thread__header-left ">
+            <span class="omni-inline-thread omni-inline-thread__status is-unresolved">New Comment</span>
             ${
               draft.anchorText
-                ? `<span class="omni-inline-thread omni-inline-thread__anchor-pill markco-inline-thread__anchor-pill">"${escapeHtml(
+                ? `<span class="omni-inline-thread omni-inline-thread__anchor-pill ">"${escapeHtml(
                     draft.anchorText
                   )}"</span>`
                 : ''
             }
           </div>
-          <div class="omni-inline-thread omni-inline-thread__header-actions markco-inline-thread__header-actions">
-            <button type="button" class="omni-inline-header-btn markco-inline-header-btn" data-action="cancel-new-comment" title="Cancel">✕</button>
+          <div class="omni-inline-thread omni-inline-thread__header-actions ">
+            <button type="button" class="omni-inline-header-btn " data-action="cancel-new-comment" title="Cancel">✕</button>
           </div>
         </div>
-        <div class="omni-inline-thread omni-inline-thread__body markco-inline-thread__body">
+        <div class="omni-inline-thread omni-inline-thread__body ">
           ${
             !draft.anchorText
               ? `
-            <div class="omni-inline-field markco-inline-field">
-              <label class="omni-inline-label markco-inline-label">Target text in Markdown:</label>
-              <input id="markco-inline-new-comment-anchor" class="omni-inline-anchor-input markco-inline-anchor-input" type="text" placeholder="Enter target phrase from document..." value="" />
+            <div class="omni-inline-field ">
+              <label class="omni-inline-label ">Target text in Markdown:</label>
+              <input id="omni-inline-new-comment-anchor" class="omni-inline-anchor-input " type="text" placeholder="Enter target phrase from document..." value="" />
             </div>
           `
-              : `<input id="markco-inline-new-comment-anchor" type="hidden" value="${escapeHtml(
+              : `<input id="omni-inline-new-comment-anchor" type="hidden" value="${escapeHtml(
                   draft.anchorText
                 )}" />`
           }
           <textarea
-            id="markco-inline-new-comment-input"
-            class="omni-inline-textarea markco-inline-textarea"
+            id="omni-inline-new-comment-input"
+            class="omni-inline-textarea "
             rows="3"
             placeholder="Add a comment... (Ctrl+Enter to save)"
           ></textarea>
-          <div class="omni-inline-form-actions markco-inline-form-actions">
-            <button type="button" class="omni-inline-btn markco-inline-btn is-secondary" data-action="cancel-new-comment">Cancel</button>
-            <button type="button" class="omni-inline-btn markco-inline-btn is-primary" data-action="submit-new-comment">Comment</button>
+          <div class="omni-inline-form-actions ">
+            <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-new-comment">Cancel</button>
+            <button type="button" class="omni-inline-btn is-primary" data-action="submit-new-comment">Comment</button>
           </div>
         </div>
       </div>
@@ -1088,7 +1079,7 @@ export function initOmniAnnotations(getMarkdownValue) {
               if (activeEditCommentId) {
                 setTimeout(() => {
                   const input = zonesLayer.querySelector(
-                    `#markco-edit-input-${CSS.escape(commentId)}`
+                    `#omni-edit-input-${CSS.escape(commentId)}`
                   );
                   input?.focus();
                 }, 20);
@@ -1102,7 +1093,7 @@ export function initOmniAnnotations(getMarkdownValue) {
           case 'save-edit':
             if (commentId) {
               const input = zonesLayer.querySelector(
-                `#markco-edit-input-${CSS.escape(commentId)}`
+                `#omni-edit-input-${CSS.escape(commentId)}`
               );
               const content = input ? input.value.trim() : '';
               if (content) {
@@ -1130,7 +1121,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                 `[data-reply-container="${CSS.escape(commentId)}"]`
               );
               const input = zonesLayer.querySelector(
-                `#markco-reply-input-${CSS.escape(commentId)}`
+                `#omni-reply-input-${CSS.escape(commentId)}`
               );
               if (input) {
                 input.value = '';
@@ -1144,7 +1135,7 @@ export function initOmniAnnotations(getMarkdownValue) {
           case 'submit-reply':
             if (commentId) {
               const input = zonesLayer.querySelector(
-                `#markco-reply-input-${CSS.escape(commentId)}`
+                `#omni-reply-input-${CSS.escape(commentId)}`
               );
               const content = input ? input.value.trim() : '';
               if (content) {
@@ -1164,8 +1155,8 @@ export function initOmniAnnotations(getMarkdownValue) {
             renderInlineZones();
             break;
           case 'submit-new-comment': {
-            const anchorEl = zonesLayer.querySelector('#markco-inline-new-comment-anchor');
-            const contentEl = zonesLayer.querySelector('#markco-inline-new-comment-input');
+            const anchorEl = zonesLayer.querySelector('#omni-inline-new-comment-anchor');
+            const contentEl = zonesLayer.querySelector('#omni-inline-new-comment-input');
             const anchorText = anchorEl
               ? anchorEl.value.trim()
               : newCommentDraft?.anchorText || '';
@@ -1184,7 +1175,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       });
     });
 
-    zonesLayer.querySelectorAll('.markco-inline-reply-input').forEach(textarea => {
+    zonesLayer.querySelectorAll('.omni-inline-reply-input').forEach(textarea => {
       const commentId = textarea.getAttribute('data-comment-id');
       const container = commentId
         ? zonesLayer.querySelector(`[data-reply-container="${CSS.escape(commentId)}"]`)
@@ -1214,7 +1205,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       });
     });
 
-    const newCommentInput = zonesLayer.querySelector('#markco-inline-new-comment-input');
+    const newCommentInput = zonesLayer.querySelector('#omni-inline-new-comment-input');
     if (newCommentInput) {
       newCommentInput.addEventListener('keydown', e => {
         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
@@ -1229,7 +1220,7 @@ export function initOmniAnnotations(getMarkdownValue) {
 
     if (activeEditCommentId) {
       const editInput = zonesLayer.querySelector(
-        `#markco-edit-input-${CSS.escape(activeEditCommentId)}`
+        `#omni-edit-input-${CSS.escape(activeEditCommentId)}`
       );
       if (editInput) {
         editInput.addEventListener('keydown', e => {
@@ -1250,14 +1241,13 @@ export function initOmniAnnotations(getMarkdownValue) {
     const contentRoot = getContentRoot();
     if (!root || !contentRoot) return;
 
-    root.querySelectorAll('[data-omni-zone], [data-markco-zone]').forEach(el => {
+    root.querySelectorAll('[data-omni-zone]').forEach(el => {
       el.removeAttribute('data-omni-zone');
-      el.removeAttribute('data-markco-zone');
     });
 
     const blockZoneMap = new Map();
     const fallbackBlock = contentRoot.querySelector(
-      'p:not(.markco-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
     );
 
     const sortedItems = [...commentRanges].sort((a, b) => {
@@ -1306,16 +1296,14 @@ export function initOmniAnnotations(getMarkdownValue) {
 
       if (!isZoneVisible) {
         blockEl.removeAttribute('data-omni-zone');
-      blockEl.removeAttribute('data-markco-zone');
         continue;
       }
 
-      const zoneId = `markco-zone-${zoneCounter++}`;
+      const zoneId = `omni-zone-${zoneCounter++}`;
       blockEl.setAttribute('data-omni-zone', zoneId);
-      blockEl.setAttribute('data-markco-zone', zoneId);
 
       const zoneEl = document.createElement('div');
-      zoneEl.className = 'markco-inline-zone';
+      zoneEl.className = 'omni-inline-zone';
       zoneEl.setAttribute('data-zone-id', zoneId);
 
       const threadsHtml = visibleComments
@@ -1326,8 +1314,8 @@ export function initOmniAnnotations(getMarkdownValue) {
         : '';
 
       zoneEl.innerHTML = `
-        <div class="omni-inline-zone omni-inline-zone__arrow markco-inline-zone__arrow"></div>
-        <div class="omni-inline-zone omni-inline-zone__stack markco-inline-zone__stack">
+        <div class="omni-inline-zone__arrow"></div>
+        <div class="omni-inline-zone__stack">
           ${threadsHtml}
           ${draftHtml}
         </div>
@@ -1371,14 +1359,13 @@ export function initOmniAnnotations(getMarkdownValue) {
       cachedAuthor = activeComments[0].author;
     }
 
-    root.querySelectorAll('[data-omni-comments], [data-markco-comments]').forEach(el => {
+    root.querySelectorAll('[data-omni-comments]').forEach(el => {
       el.removeAttribute('data-omni-comments');
-      el.removeAttribute('data-markco-comments');
     });
 
     commentRanges = [];
     const fallbackBlock = contentRoot.querySelector(
-      'p:not(.markco-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
     );
 
     if (activeComments.length > 0) {
@@ -1442,34 +1429,29 @@ export function initOmniAnnotations(getMarkdownValue) {
 
       for (const [blockEl, count] of blockCounts.entries()) {
         blockEl.setAttribute('data-omni-comments', String(count));
-        blockEl.setAttribute('data-markco-comments', String(count));
       }
 
       if (window.CSS && CSS.highlights && window.Highlight) {
         if (normalHighlightRanges.length > 0) {
           CSS.highlights.set(
-            'markco-comment',
+            'omni-comment',
             new Highlight(...normalHighlightRanges)
           );
         } else {
           CSS.highlights.delete('omni-comment');
-          CSS.highlights.delete('markco-comment');
         }
         if (focusedHighlightRanges.length > 0) {
           CSS.highlights.set(
-            'markco-comment-focused',
+            'omni-comment-focused',
             new Highlight(...focusedHighlightRanges)
           );
         } else {
           CSS.highlights.delete('omni-comment-focused');
-          CSS.highlights.delete('markco-comment-focused');
         }
       }
     } else if (window.CSS && CSS.highlights) {
       CSS.highlights.delete('omni-comment');
-      CSS.highlights.delete('markco-comment');
       CSS.highlights.delete('omni-comment-focused');
-      CSS.highlights.delete('markco-comment-focused');
     }
 
     renderInlineZones();
@@ -1502,7 +1484,7 @@ export function initOmniAnnotations(getMarkdownValue) {
 
     const targetEl =
       e.target instanceof Element
-        ? e.target.closest('[data-omni-comments], [data-markco-comments]')
+        ? e.target.closest('[data-omni-comments]')
         : null;
     if (targetEl) {
       const blockRect = targetEl.getBoundingClientRect();
@@ -1615,13 +1597,14 @@ export function initOmniAnnotations(getMarkdownValue) {
 
   function getInlineState() {
     const threadElsMap = new Map();
-    zonesLayer.querySelectorAll('.markco-inline-thread[data-comment-id]').forEach(el => {
+    zonesLayer.querySelectorAll('.omni-inline-thread[data-comment-id]').forEach(el => {
       const cid = el.getAttribute('data-comment-id');
       if (cid) {
         threadElsMap.set(cid, el);
       }
     });
 
+    syncZonePositions();
     const threads = activeComments.map(comment => {
       const el = threadElsMap.get(comment.id);
       const isCollapsed = collapsedComments.has(comment.id);
@@ -1630,11 +1613,16 @@ export function initOmniAnnotations(getMarkdownValue) {
         !el ||
         el.offsetParent === null ||
         window.getComputedStyle(el).display === 'none';
-      const zoneEl = el?.closest('.markco-inline-zone');
+      const zoneEl =
+        el?.closest('.omni-inline-zone[data-zone-id]') ||
+        el?.closest('[data-zone-id]');
       const zoneId = zoneEl?.getAttribute('data-zone-id');
-      const blockEl = zoneId
-        ? document.querySelector(`[data-markco-zone="${CSS.escape(zoneId)}"]`)
-        : null;
+      const matchedZone = activeZones.find(z => z.zoneId === zoneId);
+      const blockEl =
+        matchedZone?.blockEl ||
+        (zoneId
+          ? document.querySelector(`[data-omni-zone="${CSS.escape(zoneId)}"]`)
+          : null);
       const blockRect = blockEl ? blockEl.getBoundingClientRect() : null;
       const threadRect = el ? el.getBoundingClientRect() : null;
 
@@ -1645,9 +1633,9 @@ export function initOmniAnnotations(getMarkdownValue) {
         isResolved: Boolean(comment.resolved),
         text: el ? (el.textContent || '') : (comment.content || ''),
         replyCount: el
-          ? el.querySelectorAll('.markco-inline-item--reply').length
+          ? el.querySelectorAll('.omni-inline-item--reply').length
           : (comment.replies || []).length,
-        hasReplyBox: el ? Boolean(el.querySelector('.markco-inline-reply-input')) : false,
+        hasReplyBox: el ? Boolean(el.querySelector('.omni-inline-reply-input')) : false,
         isBelowBlock: Boolean(
           blockRect && threadRect && !isHidden && threadRect.top >= blockRect.bottom - 2
         )
@@ -1664,8 +1652,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   window.__omniGetInlineState = getInlineState;
-  window.__markcoGetInlineState = getInlineState;
-
+  
   return {
     refreshHighlights,
     focusCommentById,
@@ -1675,5 +1662,3 @@ export function initOmniAnnotations(getMarkdownValue) {
   };
 }
 
-export const parseMarkcoComments = parseOmniComments;
-export const initMarkcoAnnotations = initOmniAnnotations;
