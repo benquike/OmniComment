@@ -1491,50 +1491,10 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     position: relative !important;
 }
 
-/* Fallback CSS ::before pseudo-element comment indicator */
+/* Gutter indicators are exclusively managed via .omni-gutter-layer for pixel-perfect alignment */
 [data-omni-comments]::before,
-[data-markco-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-omni-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-markco-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-heading--active[data-omni-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-heading--active[data-markco-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > [data-omni-comments]::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > .vditor-block-handle-target[data-omni-comments]::before {
-    content: "💬" !important;
-    position: absolute !important;
-    left: -32px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    font-size: 13px !important;
-    line-height: 1 !important;
-    width: 22px !important;
-    height: 22px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
-    opacity: 0.85 !important;
-    cursor: pointer !important;
-    user-select: none !important;
-    z-index: 100 !important;
-    border-radius: 4px !important;
-    background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8)) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
-    transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease !important;
-}
-
-[data-omni-comments]:hover::before,
-[data-markco-comments]:hover::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]:hover::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-omni-comments]:hover::before,
-:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > [data-omni-comments]:hover::before {
-    opacity: 1 !important;
-    visibility: visible !important;
-    transform: translateY(-50%) scale(1.15) !important;
-    background: var(--vscode-button-background, #0e639c) !important;
+[data-markco-comments]::before {
+    display: none !important;
 }
 
 /* Dedicated Gutter Chip Layer (DOM-level bulletproof reliability across all modes) */
@@ -1575,9 +1535,10 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-gutter-chip.is-collapsed {
-    opacity: 0.92;
-    border-color: var(--vscode-textLink-foreground, #58a6ff);
-    box-shadow: 0 0 0 1px var(--vscode-textLink-foreground, #58a6ff), 0 2px 6px rgba(0, 0, 0, 0.25);
+    opacity: 1 !important;
+    border-color: var(--vscode-textLink-foreground, #58a6ff) !important;
+    background: var(--vscode-editorWidget-background, #1f2328) !important;
+    box-shadow: 0 0 0 1.5px var(--vscode-textLink-foreground, #58a6ff), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .omni-gutter-chip__badge {
@@ -1632,11 +1593,12 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     pointer-events: auto;
     box-sizing: border-box;
     font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-    font-size: 12.5px;
-    line-height: 1.45;
+    font-size: 12px;
+    line-height: 1.35;
     color: var(--front-color, var(--vscode-editorWidget-foreground, #e3e3e3));
-    max-width: 420px;
-    width: 100%;
+    width: fit-content !important;
+    max-width: 340px !important;
+    min-width: 160px !important;
 }
 
 .omni-inline-zone__arrow {
@@ -1676,9 +1638,9 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
-    padding: 3px 8px;
-    min-height: 24px;
+    gap: 4px;
+    padding: 2px 6px;
+    min-height: 22px;
     box-sizing: border-box;
     background: color-mix(in srgb, var(--front-color, #ffffff) 6%, var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328)));
     border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.22));
@@ -1797,20 +1759,41 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     border: none;
     background: transparent;
     color: inherit;
-    opacity: 0.7;
-    width: 20px;
-    height: 20px;
+    opacity: 0.75;
+    width: 18px;
+    height: 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     padding: 0;
 }
 
+.omni-hover-action {
+    opacity: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.12s ease, width 0.12s ease !important;
+}
+
+.omni-inline-thread:hover .omni-hover-action {
+    opacity: 0.75 !important;
+    width: 18px !important;
+    pointer-events: auto !important;
+    padding: 0 !important;
+}
+
+.omni-inline-thread:hover .omni-hover-action:hover {
+    opacity: 1 !important;
+}
+
 .omni-inline-header-btn .codicon {
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1;
     display: inline-block;
 }
@@ -1831,10 +1814,10 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-thread__body {
-    padding: 6px 10px 8px;
+    padding: 3px 8px 4px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
 }
 
 .omni-inline-item {
@@ -1931,12 +1914,38 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     gap: 6px;
 }
 
-/* Inline Reply... Box */
+/* Inline Reply... Trigger & Box */
 .omni-inline-reply-container {
-    margin-top: 2px;
+    margin-top: 1px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+.omni-inline-reply-trigger {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--vscode-descriptionForeground, rgba(255, 255, 255, 0.55));
+    font-size: 11px;
+    line-height: 1.2;
+    padding: 2px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: color 0.1s ease, background 0.1s ease;
+}
+
+.omni-inline-reply-trigger:hover {
+    color: var(--vscode-textLink-foreground, #58a6ff);
+    background: rgba(127, 127, 127, 0.15);
+}
+
+.omni-inline-reply-trigger .codicon {
+    font-size: 11px;
 }
 
 .omni-inline-reply-input {

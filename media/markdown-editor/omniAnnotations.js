@@ -34,7 +34,7 @@ function stripMarkdownSyntax(text) {
     .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
     .replace(/^[ \t]*>[ \t]?/gm, '')
     .replace(/^[ \t]*[-*+][ \t]+(\[[ xX]\][ \t]+)?/gm, '')
-    .replace(/^[ \t]*\d+\.[ \t]+/gm, '')
+    .replace(/^[ \t]*\d+\.[ \t]+(?=[a-zA-Z])/gm, '')
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/(\*\*|__|~~|`)/g, '')
@@ -356,22 +356,67 @@ function hideStorageBlocks(root) {
   }
 }
 
+// Invariant: Block elements must be attached visible Markdown containers, never boundaries.
+// Why: Vditor injects zero-height .vditor-editor-boundary spans that clobber document titles.
+// Example: <span class="vditor-editor-boundary" data-block="0"> (rejected) vs <h1 data-block="0"> (accepted).
+function isEligibleBlock(el, contentRoot) {
+  if (!el || !contentRoot || !contentRoot.contains(el) || el === contentRoot) {
+    return false;
+  }
+  if (
+    el.classList.contains('vditor-editor-boundary') ||
+    el.closest('.vditor-editor-boundary')
+  ) {
+    return false;
+  }
+  if (
+    el.classList.contains('omni-storage-block') ||
+    el.classList.contains('markco-storage-block')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+// Invariant: Resolves enclosing block element from any DOM node within contentRoot.
+// Why: Comments and gutter chips anchor to block headers/paragraphs/tables/code fences.
+// Example: text node inside <code> inside <pre> resolves to <pre>.
 function resolveBlockElement(node, contentRoot) {
   const el = node instanceof Element ? node : node?.parentElement;
   if (!el || !contentRoot || !contentRoot.contains(el)) {
     return null;
   }
   const tableEl = el.closest('table');
-  if (tableEl && contentRoot.contains(tableEl)) {
+  if (tableEl && isEligibleBlock(tableEl, contentRoot)) {
     return tableEl;
   }
+  const preEl = el.closest('pre, .vditor-wysiwyg__pre');
+  if (preEl && isEligibleBlock(preEl, contentRoot)) {
+    return preEl;
+  }
   const blockEl = el.closest(
-    '[data-block="0"], p, li, h1, h2, h3, h4, h5, h6, blockquote, pre'
+    'h1, h2, h3, h4, h5, h6, p, li, blockquote, [data-block="0"]'
   );
-  if (blockEl && contentRoot.contains(blockEl) && blockEl !== contentRoot) {
+  if (blockEl && isEligibleBlock(blockEl, contentRoot)) {
     return blockEl;
   }
   return null;
+}
+
+// Invariant: Fallback block must be a real visible content block with positive height.
+// Why: Missing anchor matches must attach to first real block, never zero-height boundary spans.
+// Example: Returns <h1>Fixed Offset...</h1> instead of <span class="vditor-editor-boundary">.
+function getFallbackBlock(contentRoot) {
+  if (!contentRoot) return null;
+  const candidates = contentRoot.querySelectorAll(
+    'h1, h2, h3, h4, h5, h6, p, blockquote, pre, table'
+  );
+  for (const candidate of candidates) {
+    if (isEligibleBlock(candidate, contentRoot) && candidate.offsetHeight > 0) {
+      return candidate;
+    }
+  }
+  return contentRoot;
 }
 
 function buildDomTextMap(container) {
@@ -388,7 +433,7 @@ function buildDomTextMap(container) {
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (
           parent.closest(
-            '.vditor-wysiwyg__pre, .vditor-ir__marker, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
+            '.vditor-editor-boundary, .vditor-wysiwyg__marker, .vditor-ir__marker, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
           )
         ) {
           return NodeFilter.FILTER_REJECT;
@@ -450,6 +495,32 @@ function formatLineLabel(anchor) {
   return start === end ? `Line ${start}` : `Lines ${start}–${end}`;
 }
 
+// Invariant: Outputs minimal-width human-readable relative time strings (e.g. "2m", "1h", "yesterday").
+// Why: Prevents comment card header width bloat on short single-word comments.
+// Example: formatCompactTime("2026-10-29T12:50:00Z") => "2m"
+function formatCompactTime(iso) {
+  if (!iso) return '';
+  try {
+    const date = new Date(iso);
+    const diffMs = Date.now() - date.getTime();
+    if (isNaN(diffMs)) return '';
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h`;
+    const diffDays = Math.floor(diffHr / 24);
+    if (diffDays < 7) return `${diffDays}d`;
+    return date.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return '';
+  }
+}
+
 function formatRelativeTime(iso) {
   if (!iso) return '';
   try {
@@ -485,6 +556,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   const collapsedComments = new Set(); // commentIds whose inline box is collapsed to a 1-line header bar
   const collapsedReplies = new Set(); // commentIds whose responses list is collapsed
   let activeEditCommentId = null;
+  let activeReplyCommentId = null;
   let activeBlockCounts = new Map(); // blockEl -> number of active comments on this block
 
   // Inline new-comment draft state
@@ -813,13 +885,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         if (block) return block;
       }
     }
-    return (
-      contentRoot.querySelector(
-        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
-      ) ||
-      contentRoot.firstElementChild ||
-      contentRoot
-    );
+    return getFallbackBlock(contentRoot);
   }
 
   function openAddCommentComposer(selectedText = '', preferredBlockEl = null) {
@@ -857,6 +923,25 @@ export function initOmniAnnotations(getMarkdownValue) {
   window.__omniOpenAddComment = openAddCommentComposer;
   window.__markcoOpenAddComment = openAddCommentComposer;
   
+  // Invariant: Verifies that the commented block is currently visible in the active scroll viewport.
+  // Why: Avoids rendering floating gutter chips for blocks scrolled past the top toolbar or bottom edge.
+  // Example: isBlockVisibleInViewport({ top: 580, bottom: 608 }, 36, 0) => true
+  function isBlockVisibleInViewport(bRect, clipTop, clipBottom) {
+    if (bRect.bottom <= clipTop) return false;
+    if (bRect.top >= window.innerHeight - clipBottom) return false;
+    if (bRect.width === 0 && bRect.height === 0) return false;
+    return true;
+  }
+
+  // Invariant: Calculates pixel-precise gutter chip horizontal offset to the left of the commented block.
+  // Why: Ensures chips never clip into the outline sidebar or wander offscreen while maintaining breathing room from headline text.
+  // Example: calculateGutterChipLeft(240, 180) => 210
+  function calculateGutterChipLeft(blockLeft, viewportLeft) {
+    const minAllowedLeft = Math.max(4, Math.round(viewportLeft + 4));
+    const desiredLeft = Math.round(blockLeft - 30);
+    return Math.max(minAllowedLeft, desiredLeft);
+  }
+
   function syncZonePositions() {
     const root = document.getElementById('vditor');
     const contentRoot = getContentRoot();
@@ -874,9 +959,6 @@ export function initOmniAnnotations(getMarkdownValue) {
     const clipLeft = Math.max(0, viewportRect.left);
     const clipRight = Math.max(0, window.innerWidth - viewportRect.right);
     zonesLayer.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)`;
-    if (gutterLayer) {
-      gutterLayer.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px 0px)`;
-    }
 
     const cssRules = [];
     for (const zone of activeZones) {
@@ -913,13 +995,12 @@ export function initOmniAnnotations(getMarkdownValue) {
       const blockRect = blockEl.getBoundingClientRect();
       const top = Math.round(blockRect.bottom + 2);
       const left = Math.round(blockRect.left);
-      const maxCardWidth = 420;
-      const width = Math.min(maxCardWidth, Math.max(280, Math.round(blockRect.width)));
 
       zoneEl.style.top = `${top}px`;
       zoneEl.style.left = `${left}px`;
-      zoneEl.style.width = `${width}px`;
-      zoneEl.style.maxWidth = `${maxCardWidth}px`;
+      zoneEl.style.width = 'fit-content';
+      zoneEl.style.maxWidth = '340px';
+      zoneEl.style.minWidth = '160px';
 
       const arrowEl = zoneEl.querySelector('.omni-inline-zone__arrow');
       if (arrowEl) {
@@ -927,9 +1008,10 @@ export function initOmniAnnotations(getMarkdownValue) {
         if (anchorRange) {
           const rects = anchorRange.getClientRects();
           if (rects.length > 0) {
+            const cardWidth = zoneEl.offsetWidth || 240;
             arrowOffset = Math.max(
               12,
-              Math.min(width - 24, Math.round(rects[0].left - blockRect.left + 8))
+              Math.min(cardWidth - 24, Math.round(rects[0].left - blockRect.left + 8))
             );
           }
         }
@@ -945,11 +1027,7 @@ export function initOmniAnnotations(getMarkdownValue) {
           continue;
         }
         const bRect = blockEl.getBoundingClientRect();
-        if (
-          bRect.bottom <= clipTop ||
-          bRect.top >= window.innerHeight - clipBottom ||
-          (bRect.width === 0 && bRect.height === 0)
-        ) {
+        if (!isBlockVisibleInViewport(bRect, clipTop, clipBottom)) {
           continue;
         }
 
@@ -970,9 +1048,9 @@ export function initOmniAnnotations(getMarkdownValue) {
         }`;
 
         const chipTop = Math.round(
-          bRect.top + (bRect.height > 36 ? 4 : Math.max(0, (bRect.height - 22) / 2))
+          bRect.top + (bRect.height > 32 ? 6 : Math.max(0, (bRect.height - 22) / 2))
         );
-        const chipLeft = Math.max(4, Math.round(bRect.left - 28));
+        const chipLeft = calculateGutterChipLeft(bRect.left, viewportRect.left);
 
         chip.style.top = `${chipTop}px`;
         chip.style.left = `${chipLeft}px`;
@@ -1011,16 +1089,17 @@ export function initOmniAnnotations(getMarkdownValue) {
 
     const isFocused = comment.id === focusedCommentId;
     const replies = comment.replies || [];
+    const hasReplies = replies.length > 0;
     const areRepliesCollapsed = collapsedReplies.has(comment.id);
     const isEditing = activeEditCommentId === comment.id;
-    const lineLabel = formatLineLabel(comment.anchor);
+    const isReplying = activeReplyCommentId === comment.id;
     const thumbsCount = (comment.thumbsUp || []).length;
 
     return `
       <div class="omni-inline-thread ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
     }" data-comment-id="${escapeHtml(comment.id)}">
-        <!-- Compact Single-Row Header (24px) -->
+        <!-- Compact Single-Row Header -->
         <div class="omni-inline-thread__header">
           <div class="omni-inline-thread__header-left" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
             comment.id
@@ -1028,40 +1107,36 @@ export function initOmniAnnotations(getMarkdownValue) {
             <span class="omni-inline-author">${escapeHtml(comment.author || 'User')}</span>
             <span class="omni-inline-sep">·</span>
             <span class="omni-inline-time">${escapeHtml(
-              formatRelativeTime(comment.createdAt)
+              formatCompactTime(comment.createdAt)
             )}</span>
             ${
               comment.resolved
                 ? '<span class="omni-inline-status-badge is-resolved">Resolved</span>'
                 : ''
             }
-            ${
-              comment.anchor?.text
-                ? `<span class="omni-inline-anchor-pill" title="Anchored on ${escapeHtml(
-                    lineLabel
-                  )}: &quot;${escapeHtml(comment.anchor.text)}&quot;">&ldquo;${escapeHtml(
-                    comment.anchor.text
-                  )}&rdquo;</span>`
-                : ''
-            }
           </div>
           <div class="omni-inline-thread__header-actions">
-            <button type="button" class="omni-inline-header-btn" data-action="thumbs-up" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn omni-hover-action" data-action="thumbs-up" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Thumbs up">
-              👍${thumbsCount > 0 ? `<span style="font-size:10px;margin-left:2px">${thumbsCount}</span>` : ''}
+              <i class="codicon codicon-thumbsup"></i>${thumbsCount > 0 ? `<span style="font-size:10px;margin-left:2px">${thumbsCount}</span>` : ''}
+            </button>
+            <button type="button" class="omni-inline-header-btn" data-action="open-reply" data-comment-id="${escapeHtml(
+              comment.id
+            )}" title="Reply">
+              <i class="codicon codicon-reply"></i>
             </button>
             <button type="button" class="omni-inline-header-btn" data-action="toggle-resolve" data-comment-id="${escapeHtml(
               comment.id
             )}" title="${comment.resolved ? 'Reopen comment' : 'Resolve comment'}">
               <i class="codicon codicon-${comment.resolved ? 'issue-reopened' : 'check'}"></i>
             </button>
-            <button type="button" class="omni-inline-header-btn" data-action="start-edit" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn omni-hover-action" data-action="start-edit" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Edit comment">
               <i class="codicon codicon-edit"></i>
             </button>
-            <button type="button" class="omni-inline-header-btn is-danger" data-action="delete-comment" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn omni-hover-action is-danger" data-action="delete-comment" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Delete comment thread">
               <i class="codicon codicon-trash"></i>
@@ -1104,7 +1179,7 @@ export function initOmniAnnotations(getMarkdownValue) {
 
             <!-- Responses / Replies -->
             ${
-              replies.length > 0
+              hasReplies
                 ? `
               <div class="omni-inline-replies-section">
                 <button type="button" class="omni-inline-replies-toggle" data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
@@ -1130,7 +1205,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                             r.author
                           )}</span>
                           <span class="omni-inline-item__time">${escapeHtml(
-                            formatRelativeTime(r.createdAt)
+                            formatCompactTime(r.createdAt)
                           )}</span>
                           <div class="omni-inline-item__actions">
                             <button type="button" class="omni-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
@@ -1153,31 +1228,46 @@ export function initOmniAnnotations(getMarkdownValue) {
                 : ''
             }
 
-            <!-- Compact Inline Reply Box (NO duplicate Resolve button!) -->
-            <div class="omni-inline-reply-container" data-reply-container="${escapeHtml(
-              comment.id
-            )}">
-              <input
-                type="text"
-                id="omni-reply-input-${escapeHtml(comment.id)}"
-                class="omni-inline-reply-input"
-                data-comment-id="${escapeHtml(comment.id)}"
-                placeholder="Reply... (Enter to reply)"
-                autocomplete="off"
-              />
-              <div class="omni-inline-reply-actions">
-                <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
+            <!-- On-Demand Sleek Inline Reply Trigger / Box -->
+            ${
+              isReplying
+                ? `
+              <div class="omni-inline-reply-container is-active" data-reply-container="${escapeHtml(
+                comment.id
+              )}">
+                <input
+                  type="text"
+                  id="omni-reply-input-${escapeHtml(comment.id)}"
+                  class="omni-inline-reply-input"
+                  data-comment-id="${escapeHtml(comment.id)}"
+                  placeholder="Reply... (Enter to reply, Esc to cancel)"
+                  autocomplete="off"
+                />
+                <div class="omni-inline-reply-actions">
+                  <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
+                    comment.id
+                  )}">Cancel</button>
+                  <button type="button" class="omni-inline-btn is-primary" data-action="submit-reply" data-comment-id="${escapeHtml(
+                    comment.id
+                  )}">Reply</button>
+                </div>
+              </div>
+            `
+                : hasReplies
+                ? `
+              <div class="omni-inline-reply-container" data-reply-container="${escapeHtml(
+                comment.id
+              )}">
+                <button type="button" class="omni-inline-reply-trigger" data-action="open-reply" data-comment-id="${escapeHtml(
                   comment.id
-                )}">
-                  Cancel
-                </button>
-                <button type="button" class="omni-inline-btn is-primary" data-action="submit-reply" data-comment-id="${escapeHtml(
-                  comment.id
-                )}">
-                  Reply
+                )}" title="Add a reply">
+                  <i class="codicon codicon-reply"></i>
+                  <span>Reply</span>
                 </button>
               </div>
-            </div>
+            `
+                : ''
+            }
           </div>
       </div>
     `;
@@ -1327,22 +1417,21 @@ export function initOmniAnnotations(getMarkdownValue) {
               });
             }
             break;
-          case 'cancel-reply':
+          case 'open-reply':
             if (commentId) {
-              const container = zonesLayer.querySelector(
-                `[data-reply-container="${CSS.escape(commentId)}"]`
-              );
-              const input = zonesLayer.querySelector(
-                `#omni-reply-input-${CSS.escape(commentId)}`
-              );
-              if (input) {
-                input.value = '';
-                if ('rows' in input) input.rows = 1;
-                input.blur();
-              }
-              container?.classList.remove('is-active');
-              syncZonePositions();
+              activeReplyCommentId = commentId;
+              renderInlineZones();
+              setTimeout(() => {
+                const input = zonesLayer.querySelector(
+                  `#omni-reply-input-${CSS.escape(commentId)}`
+                );
+                input?.focus();
+              }, 20);
             }
+            break;
+          case 'cancel-reply':
+            activeReplyCommentId = null;
+            renderInlineZones();
             break;
           case 'submit-reply':
             if (commentId) {
@@ -1351,8 +1440,7 @@ export function initOmniAnnotations(getMarkdownValue) {
               );
               const content = input ? input.value.trim() : '';
               if (content) {
-                input.value = '';
-                if ('rows' in input) input.rows = 1;
+                activeReplyCommentId = null;
                 collapsedReplies.delete(commentId);
                 applyLocalCommentAction({
                   type: 'addReply',
@@ -1458,12 +1546,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     });
 
     const blockZoneMap = new Map();
-    const fallbackBlock =
-      contentRoot.querySelector(
-        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
-      ) ||
-      contentRoot.firstElementChild ||
-      contentRoot;
+    const fallbackBlock = getFallbackBlock(contentRoot);
 
     const sortedItems = [...commentRanges].sort((a, b) => {
       const lineDiff =
@@ -1579,12 +1662,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     });
 
     commentRanges = [];
-    const fallbackBlock =
-      contentRoot.querySelector(
-        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
-      ) ||
-      contentRoot.firstElementChild ||
-      contentRoot;
+    const fallbackBlock = getFallbackBlock(contentRoot);
 
     if (activeComments.length > 0) {
       const domMap = buildDomTextMap(contentRoot);
@@ -1912,7 +1990,13 @@ export function initOmniAnnotations(getMarkdownValue) {
         replyCount: el
           ? el.querySelectorAll('.omni-inline-item--reply').length
           : (comment.replies || []).length,
-        hasReplyBox: el ? Boolean(el.querySelector('.omni-inline-reply-input')) : false,
+        hasReplyBox: el
+          ? Boolean(
+              el.querySelector(
+                '.omni-inline-reply-container, .omni-inline-reply-input, .omni-inline-reply-trigger, [data-action="open-reply"]'
+              )
+            )
+          : false,
         isBelowBlock: Boolean(
           blockRect && threadRect && !isHidden && threadRect.top >= blockRect.bottom - 2
         )
