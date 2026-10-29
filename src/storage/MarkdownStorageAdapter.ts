@@ -2,6 +2,8 @@ import { Comment, CommentData } from '../core/types';
 import { IStorageAdapter } from './IStorageAdapter';
 
 export const OMNI_COMMENT_MARKER = '<!-- omnicomment';
+export const LEGACY_MARKCO_MARKER = '<!-- markco-comments';
+export const LEGACY_MARKCO_SHORT_MARKER = '<!-- markco';
 export const COMMENT_BLOCK_END = '-->';
 export const CURRENT_SCHEMA_VERSION = 2;
 
@@ -68,10 +70,13 @@ export class MarkdownStorageAdapter implements IStorageAdapter {
 
   /**
    * Finds the actual comment block position, searching backwards from the end of the text.
-   * Recognizes `<!-- omnicomment`.
+   * Recognizes modern `<!-- omnicomment` and legacy `<!-- markco-comments` / `<!-- markco`.
    */
   public static findCommentBlock(text: string): CommentBlockLocation | null {
-    const markers = [OMNI_COMMENT_MARKER];
+    // Invariant: Comments may be stored using modern or legacy HTML comment delimiters.
+    // Why: Preserves backwards compatibility for existing documents created by older extensions.
+    // Example: <!-- omnicomment\n{...}\n--> or <!-- markco-comments\n{...}\n-->
+    const markers = [OMNI_COMMENT_MARKER, LEGACY_MARKCO_MARKER, LEGACY_MARKCO_SHORT_MARKER];
     let latestIndex = -1;
     let latestMarker = '';
 
@@ -83,11 +88,15 @@ export class MarkdownStorageAdapter implements IStorageAdapter {
           break;
         }
         if (!this.isInsideCodeContext(text, index)) {
-          if (index > latestIndex) {
-            latestIndex = index;
-            latestMarker = marker;
+          const endIndex = text.indexOf(COMMENT_BLOCK_END, index + marker.length);
+          if (endIndex !== -1) {
+            const jsonText = text.substring(index + marker.length, endIndex).trim();
+            if (jsonText.startsWith('{') && index > latestIndex) {
+              latestIndex = index;
+              latestMarker = marker;
+              break;
+            }
           }
-          break;
         }
         searchStart = index;
       }

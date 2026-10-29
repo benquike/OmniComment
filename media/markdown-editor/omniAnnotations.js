@@ -37,30 +37,50 @@ function stripMarkdownSyntax(text) {
     .trim();
 }
 
+function isInsideCodeContext(text, position) {
+  const beforeText = text.substring(0, position);
+  const fenceMatches = beforeText.match(/```/g);
+  return fenceMatches !== null && fenceMatches.length % 2 === 1;
+}
+
 function findCommentBlockSpan(markdown) {
   if (!markdown || typeof markdown !== 'string') {
     return null;
   }
-  const startIdx = markdown.lastIndexOf(OMNI_COMMENT_BLOCK_START);
-  const activeMarker = OMNI_COMMENT_BLOCK_START;
-  if (startIdx === -1) {
-    return null;
+  // Invariant: Recognize modern <!-- omnicomment as well as legacy <!-- markco-comments delimiters outside code blocks.
+  // Why: Allows opening and editing older documents without breaking inline comment zones or gutter icons.
+  // Example: <!-- omnicomment\n{...}\n--> or <!-- markco-comments\n{...}\n-->
+  const markers = [OMNI_COMMENT_BLOCK_START, '<!-- markco-comments', '<!-- markco'];
+  for (const marker of markers) {
+    let searchStart = markdown.length;
+    while (searchStart > 0) {
+      const startIdx = markdown.lastIndexOf(marker, searchStart - 1);
+      if (startIdx === -1) {
+        break;
+      }
+      if (!isInsideCodeContext(markdown, startIdx)) {
+        const endIdx = markdown.indexOf(
+          COMMENT_BLOCK_END,
+          startIdx + marker.length
+        );
+        if (endIdx !== -1) {
+          const jsonStr = markdown.substring(startIdx + marker.length, endIdx).trim();
+          if (jsonStr.startsWith('{')) {
+            const fullEnd = endIdx + COMMENT_BLOCK_END.length;
+            return {
+              startIdx,
+              endIdx: fullEnd,
+              marker,
+              blockText: markdown.substring(startIdx, fullEnd),
+              jsonStr
+            };
+          }
+        }
+      }
+      searchStart = startIdx;
+    }
   }
-  const endIdx = markdown.indexOf(
-    COMMENT_BLOCK_END,
-    startIdx + activeMarker.length
-  );
-  if (endIdx === -1) {
-    return null;
-  }
-  const fullEnd = endIdx + COMMENT_BLOCK_END.length;
-  return {
-    startIdx,
-    endIdx: fullEnd,
-    marker: activeMarker,
-    blockText: markdown.substring(startIdx, fullEnd),
-    jsonStr: markdown.substring(startIdx + activeMarker.length, endIdx).trim()
-  };
+  return null;
 }
 
 export function parseOmniComments(markdown) {

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { Comment, Reply } from '../types';
+import { MarkdownStorageAdapter } from '../storage/MarkdownStorageAdapter';
 
 export class OmniCommentInlineItem implements vscode.Comment {
   public body: vscode.MarkdownString;
@@ -55,11 +56,14 @@ export class InlineCommentController implements vscode.Disposable {
         if (document.languageId !== 'markdown' && document.languageId !== 'skill') {
           return [];
         }
+        // Invariant: The comment storage block at the bottom of the document should not be commented on.
+        // Why: Prevents nesting comments inside the serialized comment JSON block itself.
+        // Example: Comments allowed on lines 0..endLine, excluding the trailing <!-- omnicomment block.
         const text = document.getText();
-        const blockIdx = text.lastIndexOf('<!-- omnicomment');
+        const loc = MarkdownStorageAdapter.findCommentBlock(text);
         const endLine =
-          blockIdx !== -1
-            ? Math.max(0, document.positionAt(blockIdx).line - 1)
+          loc !== null
+            ? Math.max(0, document.positionAt(loc.index).line - 1)
             : Math.max(0, document.lineCount - 1);
         return [new vscode.Range(0, 0, endLine, 0)];
       }

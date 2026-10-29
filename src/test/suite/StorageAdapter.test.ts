@@ -87,6 +87,38 @@ suite('StorageAdapter Test Suite', () => {
       assert.ok(updated.includes('<!-- omnicomment'));
       assert.ok(updated.includes('"id": "test-2"'));
     });
+
+    test('should parse comments from legacy <!-- markco-comments block and ignore occurrences in code blocks', () => {
+      // Topology: # Doc -> ```mermaid\nSave to <!-- omnicomment\n``` -> <!-- markco-comments\n{"comments":[...]}\n-->
+      // Expected: Parses legacy block at end while ignoring the delimiter inside the mermaid code block.
+      const legacyCommentData = {
+        version: 2,
+        comments: [
+          {
+            id: 'legacy-1',
+            anchor: { text: 'Heading', startLine: 0, startChar: 2, endLine: 0, endChar: 9 },
+            content: 'Legacy comment content',
+            author: 'LegacyUser',
+            createdAt: '2026-01-01T00:00:00.000Z'
+          }
+        ]
+      };
+      const text = [
+        '# Heading',
+        '',
+        '```mermaid',
+        'sequenceDiagram',
+        '  A->>B: Save to <!-- omnicomment Block',
+        '```',
+        '',
+        `<!-- markco-comments\n${JSON.stringify(legacyCommentData)}\n-->`
+      ].join('\n');
+
+      const comments = adapter.parseCommentsFromText(text);
+      assert.strictEqual(comments.length, 1);
+      assert.strictEqual(comments[0].id, 'legacy-1');
+      assert.strictEqual(comments[0].content, 'Legacy comment content');
+    });
   });
 
   suite('MemoryStorageAdapter', () => {
