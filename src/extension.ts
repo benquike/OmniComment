@@ -623,7 +623,8 @@ export function activate(context: vscode.ExtensionContext) {
         { language: 'markdown' },
         { language: 'skill' },
         { language: 'plaintext' },
-        { language: 'text' }
+        { language: 'text' },
+        { pattern: '**/*.{txt,text,md,markdown,skill}' }
       ],
       new CommentCodeActionProvider(),
       {
