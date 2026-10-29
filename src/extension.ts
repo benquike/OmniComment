@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { CommentService } from './services/CommentService';
 import { CommentDecorator } from './decorators/CommentDecorator';
@@ -24,15 +25,33 @@ let pendingInlineStateResolver: ((state: any) => void) | undefined;
  */
 function syncMarkdownEditorIntegration(extPath: string): void {
   try {
-    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
-    if (!officeExt?.extensionPath) {
+    let officeExtPath: string | undefined =
+      vscode.extensions.getExtension('cweijan.vscode-office')?.extensionPath;
+
+    if (!officeExtPath || !fs.existsSync(officeExtPath)) {
+      const extensionsDir = path.join(os.homedir(), '.vscode', 'extensions');
+      if (fs.existsSync(extensionsDir)) {
+        const match = fs
+          .readdirSync(extensionsDir)
+          .filter(e => e.startsWith('cweijan.vscode-office-'))
+          .sort()
+          .pop();
+        if (match) {
+          officeExtPath = path.join(extensionsDir, match);
+        }
+      }
+    }
+
+    if (!officeExtPath || !fs.existsSync(officeExtPath)) {
       return;
     }
+
     const srcDir = path.join(extPath, 'media', 'markdown-editor');
-    const dstDir = path.join(officeExt.extensionPath, 'resource', 'markdown');
+    const dstDir = path.join(officeExtPath, 'resource', 'markdown');
     if (!fs.existsSync(srcDir) || !fs.existsSync(dstDir)) {
       return;
     }
+
     for (const file of [
       'omniAnnotations.js',
       'index.js',
@@ -47,6 +66,31 @@ function syncMarkdownEditorIntegration(extPath: string): void {
         const dstContent = fs.existsSync(d) ? fs.readFileSync(d, 'utf8') : '';
         if (srcContent !== dstContent) {
           fs.writeFileSync(d, srcContent, 'utf8');
+        }
+      }
+    }
+
+    // Clean up any legacy markcoAnnotations.js file to avoid obsolete script references
+    const legacyAnnotations = path.join(dstDir, 'markcoAnnotations.js');
+    if (fs.existsSync(legacyAnnotations)) {
+      try {
+        fs.unlinkSync(legacyAnnotations);
+      } catch {
+        // Ignore removal error
+      }
+    }
+
+    // Ensure out/extension.js in cweijan.vscode-office registers omni and legacy commands
+    const officeOutExt = path.join(officeExtPath, 'out', 'extension.js');
+    if (fs.existsSync(officeOutExt)) {
+      let content = fs.readFileSync(officeOutExt, 'utf8');
+      if (!content.includes('office.markdown.openAddCommentInEditor')) {
+        const hook = 'function zS(t,e){for(let r of yP.values())r.emit(t,e)}';
+        const injection =
+          'function zS(t,e){for(let r of yP.values())r.emit(t,e)}var xP=mt(require("vscode"));try{xP.commands.registerCommand("office.markdown.focusOmniComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.focusMarkcoComment",(t,e)=>{zS("focusOmniComment",{commentId:t,anchorText:e})});xP.commands.registerCommand("office.markdown.openAddCommentInEditor",t=>{zS("openAddCommentInEditor",{selectedText:t})});xP.commands.registerCommand("office.markdown.queryOmniInlineState",t=>{zS("queryOmniInlineState",t||{})});xP.commands.registerCommand("office.markdown.queryMarkcoInlineState",t=>{zS("queryOmniInlineState",t||{})})}catch{}';
+        if (content.includes(hook)) {
+          content = content.replace(hook, injection);
+          fs.writeFileSync(officeOutExt, content, 'utf8');
         }
       }
     }

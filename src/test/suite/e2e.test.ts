@@ -285,4 +285,61 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
       );
     });
   });
+
+  test('E2E: Should parse and display legacy <!-- markco-comments in Markdown Editor', async () => {
+    const filePath = path.join(tempDir, 'e2e-legacy-markco.md');
+    const legacyCommentId = 'legacy-comm-1';
+    const legacyCommentText = 'Legacy comment created under markco';
+    const initialContent = [
+      '# Legacy Document',
+      '',
+      'This is a legacy document with existing annotations.',
+      '',
+      '<!-- markco-comments',
+      JSON.stringify(
+        {
+          version: 1,
+          comments: [
+            {
+              id: legacyCommentId,
+              anchor: {
+                text: 'existing annotations',
+                startLine: 2,
+                startChar: 27,
+                endLine: 2,
+                endChar: 47
+              },
+              content: legacyCommentText,
+              author: 'Legacy User',
+              createdAt: '2026-10-25T10:00:00.000Z'
+            }
+          ]
+        },
+        null,
+        2
+      ),
+      '-->'
+    ].join('\n');
+
+    fs.writeFileSync(filePath, initialContent, 'utf-8');
+    const fileUri = vscode.Uri.file(filePath);
+
+    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
+    if (officeExt) {
+      await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
+      await waitForCondition(async () => {
+        const state = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+        return Boolean(
+          state &&
+            state.threadCount === 1 &&
+            state.threads[0].text.includes(legacyCommentText)
+        );
+      }, 8000);
+
+      const state = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      assert.ok(state);
+      assert.strictEqual(state!.threadCount, 1);
+      assert.strictEqual(state!.threads[0].commentId, legacyCommentId);
+    }
+  });
 });

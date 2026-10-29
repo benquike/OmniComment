@@ -292,19 +292,32 @@ handler.on("open", async (md) => {
         }, 50);
       })
       const handleFocusComment = (payload) => {
-        if (payload && omniAnnotations) {
-          omniAnnotations.focusCommentById(payload.commentId, payload.anchorText);
+        const commentId = typeof payload === 'string' ? payload : payload?.commentId;
+        const anchorText = typeof payload === 'object' ? payload?.anchorText : undefined;
+        if (commentId && omniAnnotations) {
+          omniAnnotations.focusCommentById(commentId, anchorText);
         }
       };
       handler.on("focusOmniComment", handleFocusComment);
+      handler.on("focusMarkcoComment", handleFocusComment);
       handler.on("openAddCommentInEditor", (payload) => {
+        const text = typeof payload === 'string' ? payload : (payload?.selectedText || '');
         if (omniAnnotations) {
-          omniAnnotations.openAddCommentComposer(payload?.selectedText || '');
+          omniAnnotations.openAddCommentComposer(text);
+        } else if (typeof window.__omniOpenAddComment === 'function') {
+          window.__omniOpenAddComment(text);
+        } else if (typeof window.__markcoOpenAddComment === 'function') {
+          window.__markcoOpenAddComment(text);
         }
       })
       const handleQueryInlineState = (payload) => {
         if (payload?.inputSelector && typeof payload.inputValue === 'string') {
           let inputEl = document.querySelector(payload.inputSelector);
+          if (!inputEl && payload.inputSelector.includes('markco')) {
+            inputEl = document.querySelector(payload.inputSelector.replace(/markco/g, 'omni'));
+          } else if (!inputEl && payload.inputSelector.includes('omni')) {
+            inputEl = document.querySelector(payload.inputSelector.replace(/omni/g, 'markco'));
+          }
           if (inputEl && 'value' in inputEl) {
             inputEl.value = payload.inputValue;
             inputEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -312,6 +325,11 @@ handler.on("open", async (md) => {
         }
         if (payload?.clickSelector) {
           let btn = document.querySelector(payload.clickSelector);
+          if (!btn && payload.clickSelector.includes('markco')) {
+            btn = document.querySelector(payload.clickSelector.replace(/markco/g, 'omni'));
+          } else if (!btn && payload.clickSelector.includes('omni')) {
+            btn = document.querySelector(payload.clickSelector.replace(/omni/g, 'markco'));
+          }
           if (btn instanceof HTMLElement) {
             btn.click();
           }
@@ -323,11 +341,12 @@ handler.on("open", async (md) => {
         });
       };
       handler.on("queryOmniInlineState", handleQueryInlineState);
+      handler.on("queryMarkcoInlineState", handleQueryInlineState);
       handler.on("insertImageMarkdown", (markdown) => {
         editor.insertMarkdown(markdown);
       })
       handler.on("gotoBlock", (fragment) => {
-        if (typeof fragment === 'string' && fragment.startsWith('omnicomment:')) {
+        if (typeof fragment === 'string' && (fragment.startsWith('omnicomment:') || fragment.startsWith('markco:'))) {
           const [, commentId, ...rest] = fragment.split(':');
           omniAnnotations?.focusCommentById(commentId, rest.join(':'));
           return;

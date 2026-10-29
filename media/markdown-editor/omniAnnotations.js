@@ -1,6 +1,12 @@
 const OMNI_COMMENT_BLOCK_START = '<!-- omnicomment';
 const COMMENT_BLOCK_START = OMNI_COMMENT_BLOCK_START;
 const COMMENT_BLOCK_END = '-->';
+const ALL_COMMENT_MARKERS = [
+  OMNI_COMMENT_BLOCK_START,
+  '<!-- markco-comments',
+  '<!-- markco',
+  '<!-- commark-comments'
+];
 
 function sanitizeForStorage(text) {
   return typeof text === 'string' ? text.replace(/-->/g, '--\u200B>') : '';
@@ -47,11 +53,11 @@ function findCommentBlockSpan(markdown) {
   if (!markdown || typeof markdown !== 'string') {
     return null;
   }
-  // Invariant: Recognize <!-- omnicomment delimiters outside code blocks.
-  // Why: Prevents false matches from code blocks or diagrams.
-  // Example: <!-- omnicomment\n{...}\n-->
-  const markers = [OMNI_COMMENT_BLOCK_START];
-  for (const marker of markers) {
+  // Invariant: Recognize <!-- omnicomment delimiters (and legacy markco/commark markers) outside code blocks.
+  // Why: Prevents false matches from code blocks or diagrams while supporting legacy comment blocks.
+  // Example: <!-- omnicomment\n{...}\n--> or <!-- markco-comments\n{...}\n-->
+  let bestSpan = null;
+  for (const marker of ALL_COMMENT_MARKERS) {
     let searchStart = markdown.length;
     while (searchStart > 0) {
       const startIdx = markdown.lastIndexOf(marker, searchStart - 1);
@@ -67,20 +73,24 @@ function findCommentBlockSpan(markdown) {
           const jsonStr = markdown.substring(startIdx + marker.length, endIdx).trim();
           if (jsonStr.startsWith('{')) {
             const fullEnd = endIdx + COMMENT_BLOCK_END.length;
-            return {
+            const span = {
               startIdx,
               endIdx: fullEnd,
               marker,
               blockText: markdown.substring(startIdx, fullEnd),
               jsonStr
             };
+            if (!bestSpan || span.startIdx > bestSpan.startIdx) {
+              bestSpan = span;
+            }
+            break;
           }
         }
       }
       searchStart = startIdx;
     }
   }
-  return null;
+  return bestSpan;
 }
 
 export function parseOmniComments(markdown) {
@@ -336,10 +346,12 @@ function hideStorageBlocks(root) {
   const blocks = root.querySelectorAll('[data-type="html-block"]');
   for (const block of blocks) {
     const text = block.textContent || '';
-    if (text.includes(OMNI_COMMENT_BLOCK_START)) {
+    if (ALL_COMMENT_MARKERS.some(marker => text.includes(marker))) {
       block.classList.add('omni-storage-block');
+      block.classList.add('markco-storage-block');
     } else {
       block.classList.remove('omni-storage-block');
+      block.classList.remove('markco-storage-block');
     }
   }
 }
@@ -702,8 +714,12 @@ export function initOmniAnnotations(getMarkdownValue) {
         if (block) return block;
       }
     }
-    return contentRoot.querySelector(
-      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+    return (
+      contentRoot.querySelector(
+        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      ) ||
+      contentRoot.firstElementChild ||
+      contentRoot
     );
   }
 
@@ -740,6 +756,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   window.__omniOpenAddComment = openAddCommentComposer;
+  window.__markcoOpenAddComment = openAddCommentComposer;
   
   function syncZonePositions() {
     const root = document.getElementById('vditor');
@@ -1269,9 +1286,12 @@ export function initOmniAnnotations(getMarkdownValue) {
     });
 
     const blockZoneMap = new Map();
-    const fallbackBlock = contentRoot.querySelector(
-      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
-    );
+    const fallbackBlock =
+      contentRoot.querySelector(
+        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      ) ||
+      contentRoot.firstElementChild ||
+      contentRoot;
 
     const sortedItems = [...commentRanges].sort((a, b) => {
       const lineDiff =
@@ -1387,9 +1407,12 @@ export function initOmniAnnotations(getMarkdownValue) {
     });
 
     commentRanges = [];
-    const fallbackBlock = contentRoot.querySelector(
-      'p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
-    );
+    const fallbackBlock =
+      contentRoot.querySelector(
+        '[data-block="0"]:not(.omni-storage-block), p:not(.omni-storage-block), h1, h2, h3, h4, h5, h6, li, blockquote, pre, table'
+      ) ||
+      contentRoot.firstElementChild ||
+      contentRoot;
 
     if (activeComments.length > 0) {
       const domMap = buildDomTextMap(contentRoot);

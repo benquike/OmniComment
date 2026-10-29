@@ -1469,25 +1469,30 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     .office-read-aloud__settings > .office-read-aloud__stop { grid-column: 2; grid-row: 1; }
 }
 
-::highlight(omni-comment) {
+::highlight(omni-comment),
+::highlight(markco-comment) {
     background-color: rgba(255, 212, 0, 0.34);
     text-decoration: underline solid rgba(230, 165, 0, 0.85) 2px;
 }
 
-::highlight(omni-comment-focused) {
+::highlight(omni-comment-focused),
+::highlight(markco-comment-focused) {
     background-color: rgba(255, 165, 0, 0.52);
     text-decoration: underline solid rgba(255, 115, 0, 1) 2.5px;
 }
 
-.omni-storage-block {
+.omni-storage-block,
+.markco-storage-block {
     display: none !important;
 }
 
-[data-omni-comments] {
+[data-omni-comments],
+[data-markco-comments] {
     position: relative;
 }
 
-[data-omni-comments]::before {
+[data-omni-comments]::before,
+[data-markco-comments]::before {
     content: "💬";
     position: absolute;
     left: -26px;
@@ -1501,7 +1506,8 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     transition: transform 0.12s ease, opacity 0.12s ease;
 }
 
-[data-omni-comments]:hover::before {
+[data-omni-comments]:hover::before,
+[data-markco-comments]:hover::before {
     opacity: 1;
     transform: scale(1.1);
 }
