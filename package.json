@@ -151,31 +151,31 @@
       "comments/commentThread/context": [
         {
           "command": "omnicomment.inlineReplyComment",
-          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "when": "commentController == omnicomment-inline",
           "group": "inline"
         }
       ],
       "comments/commentThread/title": [
         {
           "command": "omnicomment.inlineToggleResolve",
-          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "when": "commentController == omnicomment-inline",
           "group": "navigation@1"
         },
         {
           "command": "omnicomment.inlineToggleCollapseThread",
-          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "when": "commentController == omnicomment-inline",
           "group": "navigation@2"
         },
         {
           "command": "omnicomment.inlineDeleteThread",
-          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "when": "commentController == omnicomment-inline",
           "group": "navigation@3"
         }
       ],
       "comments/comment/title": [
         {
           "command": "omnicomment.inlineDeleteCommentItem",
-          "when": "commentController == omnicomment-inline || commentController == markco-inline",
+          "when": "commentController == omnicomment-inline",
           "group": "inline"
         }
       ]

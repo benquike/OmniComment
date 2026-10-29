@@ -47,10 +47,10 @@ function findCommentBlockSpan(markdown) {
   if (!markdown || typeof markdown !== 'string') {
     return null;
   }
-  // Invariant: Recognize modern <!-- omnicomment as well as legacy <!-- markco-comments delimiters outside code blocks.
-  // Why: Allows opening and editing older documents without breaking inline comment zones or gutter icons.
-  // Example: <!-- omnicomment\n{...}\n--> or <!-- markco-comments\n{...}\n-->
-  const markers = [OMNI_COMMENT_BLOCK_START, '<!-- markco-comments', '<!-- markco'];
+  // Invariant: Recognize <!-- omnicomment delimiters outside code blocks.
+  // Why: Prevents false matches from code blocks or diagrams.
+  // Example: <!-- omnicomment\n{...}\n-->
+  const markers = [OMNI_COMMENT_BLOCK_START];
   for (const marker of markers) {
     let searchStart = markdown.length;
     while (searchStart > 0) {
