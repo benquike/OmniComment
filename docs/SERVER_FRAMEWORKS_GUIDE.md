@@ -1,6 +1,6 @@
 # OmniComment Server Frameworks & Backend Integration Guide
 
-Comprehensive guide for implementing, deploying, and maintaining **OmniComment** comment persistence backends across modern server-side languages and web frameworks, including **Python (FastAPI & Flask)**, **Go (Gin & net/http)**, **PHP (Modern PHP 8 & Laravel)**, **Node.js (Express)**, and **Java (Spring Boot)**.
+Comprehensive guide for implementing, deploying, and maintaining **OmniComment** comment persistence backends across modern server-side languages and web frameworks, including **Python (FastAPI & Flask)**, **Go (Gin & net/http)**, **PHP (Modern PHP 8 & Laravel)**, **Angular SSR (Express & Node.js)**, **Node.js (Express)**, and **Java (Spring Boot)**.
 
 ---
 
@@ -17,9 +17,10 @@ Comprehensive guide for implementing, deploying, and maintaining **OmniComment**
 5. [PHP Backend Implementations](#5-php-backend-implementations)
    - [Modern Standalone PHP 8.2+ (PDO SQLite)](#modern-standalone-php-82-pdo-sqlite)
    - [Laravel 10 & 11 (Eloquent & Route Controller)](#laravel-10--11-eloquent--route-controller)
-6. [Other Frameworks (Node.js Express & Java Spring Boot)](#6-other-frameworks-nodejs-express--java-spring-boot)
-7. [Client Integration with @omnicomment/web-plugin](#7-client-integration-with-omnicommentweb-plugin)
-8. [Security, Authentication & Production Hardening](#8-security-authentication--production-hardening)
+6. [Angular SSR & Express Application Server](#6-angular-ssr--express-application-server)
+7. [Other Frameworks (Node.js Express & Java Spring Boot)](#7-other-frameworks-nodejs-express--java-spring-boot)
+8. [Client Integration with @omnicomment/web-plugin](#8-client-integration-with-omnicommentweb-plugin)
+9. [Security, Authentication & Production Hardening](#9-security-authentication--production-hardening)
 
 ---
 
@@ -43,6 +44,7 @@ flowchart LR
         PY["Python\n(FastAPI / Flask)"]
         GO["Go\n(Gin / net/http)"]
         PHP["PHP\n(PHP 8.2+ / Laravel)"]
+        ANGULAR["Angular SSR\n(server.ts / Express)"]
         NODE["Node.js\n(Express / NestJS)"]
     end
 
@@ -56,10 +58,12 @@ flowchart LR
     AUTH --> PY
     AUTH --> GO
     AUTH --> PHP
+    AUTH --> ANGULAR
     AUTH --> NODE
     PY --> SQLITE
     GO --> JSONSTORE
     PHP --> SQLITE
+    ANGULAR --> JSONSTORE
     NODE --> PG
 ```
 
@@ -410,7 +414,90 @@ Schema::create('comments', function (Blueprint $table) {
 
 ---
 
-## 6. Other Frameworks (Node.js Express & Java Spring Boot)
+## 6. Angular SSR & Express Application Server
+
+Ready-to-run source code is located in [`servers/angular-ssr/`](../servers/angular-ssr/).
+
+Modern Angular applications (Angular 17, 18, and 19) leverage Angular SSR with a unified Node.js Express server (`server.ts`). This allows hosting both server-rendered Angular components and the OmniComment persistence REST API inside the same service, eliminating cross-origin CORS overhead and simplifying deployment.
+
+### 1. Angular Express SSR Server (`server.ts`)
+```typescript
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import * as path from 'path';
+
+const app = express();
+const PORT = process.env['PORT'] || 4000;
+
+app.use(cors({ origin: true }));
+app.use(express.json());
+
+// In-memory + persistent atomic storage
+const store: Record<string, Record<string, any>> = {};
+
+// GET: Retrieve comments for document
+app.get('/api/documents/:docId/comments', (req: Request, res: Response) => {
+  const { docId } = req.params;
+  const includeResolved = req.query['includeResolved'] !== 'false';
+  let list = Object.values(store[docId] || {});
+  if (!includeResolved) list = list.filter((c) => !c.resolved);
+  res.json({ success: true, count: list.length, comments: list });
+});
+
+// POST: Create comment thread
+app.post('/api/documents/:docId/comments', (req: Request, res: Response) => {
+  const { docId } = req.params;
+  const comment = { id: `comment-${Date.now()}`, documentId: docId, ...req.body, createdAt: new Date().toISOString() };
+  if (!store[docId]) store[docId] = {};
+  store[docId][comment.id] = comment;
+  res.status(201).json({ success: true, comment });
+});
+
+// Angular SSR Fallback (serves rendered HTML or Angular bootstrap)
+app.get('*', (req: Request, res: Response) => {
+  res.send('<!DOCTYPE html><html><body><app-root></app-root></body></html>');
+});
+
+app.listen(PORT, () => console.log(`Angular SSR & OmniComment API on http://localhost:${PORT}`));
+```
+
+### 2. Angular RxJS Client Service (`omni-comment.service.ts`)
+```typescript
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
+import { OmniComment, CreateCommentDto } from '../models/omni-comment.model';
+
+@Injectable({ providedIn: 'root' })
+export class OmniCommentService {
+  private http = inject(HttpClient);
+  private baseUrl = '/api/documents';
+
+  getComments(docId: string, includeResolved: boolean = true): Observable<OmniComment[]> {
+    return this.http.get<{ comments: OmniComment[] }>(
+      `${this.baseUrl}/${encodeURIComponent(docId)}/comments?includeResolved=${includeResolved}`
+    ).pipe(map((res) => res.comments || []));
+  }
+
+  createComment(docId: string, dto: CreateCommentDto): Observable<OmniComment> {
+    return this.http.post<{ comment: OmniComment }>(
+      `${this.baseUrl}/${encodeURIComponent(docId)}/comments`,
+      dto
+    ).pipe(map((res) => res.comment));
+  }
+}
+```
+
+### 3. Quickstart & Local Run
+```bash
+cd servers/angular-ssr
+npm install
+npm run serve
+```
+
+---
+
+## 7. Other Frameworks (Node.js Express & Java Spring Boot)
 
 ### Node.js Express
 
@@ -473,7 +560,7 @@ public class OmniCommentController {
 
 ---
 
-## 7. Client Integration with `@omnicomment/web-plugin`
+## 8. Client Integration with `@omnicomment/web-plugin`
 
 Connecting `@omnicomment/web-plugin` to any of the above backends requires just specifying the REST storage configuration:
 
@@ -504,7 +591,7 @@ const omni = initOmniComment({
 
 ---
 
-## 8. Security, Authentication & Production Hardening
+## 9. Security, Authentication & Production Hardening
 
 ### 1. JWT Authentication Middleware
 Ensure only authenticated users can create or modify comments:

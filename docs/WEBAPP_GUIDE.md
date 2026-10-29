@@ -10,15 +10,16 @@ Comprehensive guide on embedding, customizing, and scaling **OmniComment** in mo
 3. [React & Next.js Integration](#3-react--nextjs-integration)
 4. [Vue 3 & Nuxt Integration](#4-vue-3--nuxt-integration)
 5. [Svelte 5 & SvelteKit Integration](#5-svelte-5--sveltekit-integration)
-6. [Comment Persistence Approaches (With Full Code Samples)](#6-comment-persistence-approaches)
+6. [Angular 17 / 18 / 19 Integration](#6-angular-17--18--19-integration)
+7. [Comment Persistence Approaches (With Full Code Samples)](#7-comment-persistence-approaches)
    - [Approach 1: REST API Storage (Client SDK & Next.js / Express Server)](#approach-1-rest-api-storage)
    - [Approach 2: Local-First Offline Storage (IndexedDB & LocalStorage)](#approach-2-local-first-offline-storage)
    - [Approach 3: Real-Time Collaborative Storage (Supabase & WebSockets)](#approach-3-real-time-collaborative-storage)
    - [Approach 4: Git-Compatible In-File Markdown Storage (CMS & Web Editors)](#approach-4-git-compatible-in-file-markdown-storage)
    - [Approach 5: Firebase Cloud Storage & Real-Time Sync (Firestore & Cloud Functions)](#approach-5-firebase-cloud-storage--real-time-sync)
-7. [Authentication & Multi-Tenant User Roles](#7-authentication--multi-tenant-user-roles)
-8. [Theming & CSS Custom Properties](#8-theming--css-custom-properties)
-9. [Web SDK Programmatic API Reference](#9-web-sdk-programmatic-api-reference)
+8. [Authentication & Multi-Tenant User Roles](#8-authentication--multi-tenant-user-roles)
+9. [Theming & CSS Custom Properties](#9-theming--css-custom-properties)
+10. [Web SDK Programmatic API Reference](#10-web-sdk-programmatic-api-reference)
 
 ---
 
@@ -274,7 +275,67 @@ onBeforeUnmount(() => {
 
 ---
 
-## 6. Comment Persistence Approaches (With Full Code Samples)
+## 6. Angular 17 / 18 / 19 Integration
+
+### Installation
+```bash
+npm install --save @omnicomment/web-plugin
+```
+
+### Standalone Angular Component (`omni-comment.component.ts`)
+```typescript
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy } from '@angular/core';
+
+@Component({
+  selector: 'omni-comment',
+  standalone: true,
+  template: `<div class="omnicomment-angular-mount"></div>`,
+  styles: [`:host { display: block; position: relative; }`]
+})
+export class OmniCommentComponent implements OnInit, OnDestroy {
+  @Input({ required: true }) target!: string;
+  @Input({ required: true }) documentId!: string;
+  @Input() author: string = 'Anonymous';
+  @Input() apiEndpoint?: string;
+  @Input() preset: string = 'documentation-site';
+
+  @Output() commentAdded = new EventEmitter<any>();
+  @Output() commentResolved = new EventEmitter<string>();
+
+  private omniInstance: any = null;
+
+  ngOnInit(): void {
+    // SSR guard: Ensure initialization runs strictly in browser runtime
+    if (typeof window === 'undefined') return;
+
+    import('@omnicomment/web-plugin').then(({ initOmniComment }) => {
+      this.omniInstance = initOmniComment({
+        target: this.target,
+        documentId: this.documentId,
+        author: this.author,
+        preset: this.preset as any,
+        storage: {
+          type: 'rest',
+          endpoint: this.apiEndpoint || `/api/documents/${encodeURIComponent(this.documentId)}/comments`
+        },
+        onCommentAdded: (c: any) => this.commentAdded.emit(c),
+        onCommentResolved: (id: string) => this.commentResolved.emit(id)
+      });
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.omniInstance?.destroy();
+  }
+}
+```
+
+> [!TIP]
+> OmniComment provides a complete, runnable **Angular SSR application server** hosting both Angular SSR views and the comment persistence REST API in [`servers/angular-ssr/`](../servers/angular-ssr/). See the [Server Frameworks Guide](docs/SERVER_FRAMEWORKS_GUIDE.md) for full architecture and RxJS service integration details.
+
+---
+
+## 7. Comment Persistence Approaches (With Full Code Samples)
 
 OmniComment provides flexible storage adapters to support everything from offline-only personal wikis to large-scale enterprise team collaboration. Below are production-ready code samples for each of the four persistence approaches:
 
@@ -703,7 +764,7 @@ const omni = initOmniComment({
 
 ---
 
-## 7. Authentication & Multi-Tenant User Roles
+## 8. Authentication & Multi-Tenant User Roles
 
 Control who can comment, edit, resolve, or delete threads:
 
@@ -728,7 +789,7 @@ initOmniComment({
 
 ---
 
-## 8. Theming & CSS Custom Properties
+## 9. Theming & CSS Custom Properties
 
 OmniComment supports comprehensive theming via CSS variables. Override any of the following tokens in your application's CSS:
 
@@ -764,7 +825,7 @@ OmniComment supports comprehensive theming via CSS variables. Override any of th
 
 ---
 
-## 9. Web SDK Programmatic API Reference
+## 10. Web SDK Programmatic API Reference
 
 When initialized, `initOmniComment()` returns an `OmniCommentInstance` handle:
 

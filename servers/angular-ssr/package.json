@@ -1,0 +1,26 @@
+{
+  "name": "@omnicomment/angular-ssr-server",
+  "version": "0.1.0",
+  "description": "Angular SSR (Server-Side Rendering) Application & Comment Persistence Backend",
+  "scripts": {
+    "build": "tsc",
+    "serve": "ts-node server.ts",
+    "start": "ts-node server.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}
