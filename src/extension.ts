@@ -17,6 +17,7 @@ let sidebarProvider: CommentSidebarProvider;
 let inlineCommentController: InlineCommentController;
 let lastActiveMarkdownUri: vscode.Uri | undefined;
 let pendingInlineStateResolver: ((state: any) => void) | undefined;
+let isTestMode = false;
 
 /**
  * Automatically ensures any installed `cweijan.vscode-office` ("Markdown Editor") extension
@@ -332,6 +333,7 @@ async function saveDocumentIfCustomEditor(ctx: {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  isTestMode = context.extensionMode === vscode.ExtensionMode.Test;
   console.log('OmniComment extension is now active');
 
   syncMarkdownEditorIntegration(context.extensionPath);
@@ -1174,6 +1176,34 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Listen for cursor selection changes in text editors to focus active comments
+  // Invariant: Tracks cursor movement across commented ranges to synchronize sidebar and thread focus.
+  // Why: Clicking on highlighted text in standard editor immediately expands and highlights the active comment.
+  // Example: Cursor moves into Line 12 "architecture" -> focuses comment thread and sidebar item.
+  context.subscriptions.push(
+    vscode.window.onDidChangeTextEditorSelection(event => {
+      const editor = event.textEditor;
+      if (!editor || !isMarkdownCompatibleLanguage(editor.document.languageId)) {
+        return;
+      }
+      if (event.selections.length === 0) {
+        return;
+      }
+      const comments = commentService.getComments(editor.document);
+      const commentAtPos = commentDecorator.findCommentAtPosition(
+        editor.document,
+        event.selections[0].active,
+        comments
+      );
+      if (commentAtPos && commentAtPos.id !== commentDecorator.getFocusedCommentId()) {
+        commentDecorator.setFocusedComment(commentAtPos.id);
+        refreshDecorations(editor);
+        sidebarProvider.focusComment(commentAtPos.id);
+        inlineCommentController.focusCommentThread(editor.document.uri, commentAtPos.id);
+      }
+    })
+  );
+
   // Initial refresh if markdown file is already open in text editor or custom editor
   getActiveMarkdownContext().then(ctx => {
     if (ctx) {
@@ -1236,9 +1266,30 @@ function expandSelectionAtCursor(document: vscode.TextDocument, position: vscode
   return new vscode.Selection(line.range.start, line.range.end);
 }
 
+// Invariant: Prompts user for comment text in standard TextEditor mode using VS Code input box.
+// Why: workbench.action.addComment fails silently without an existing interactive thread; prompt guarantees comment creation.
+// Example: User selects "heading", prompt displays 'Add comment on "heading"', user types "needs revision".
+async function promptForTextEditorCommentContent(selectedText: string): Promise<string | undefined> {
+  if (isTestMode) {
+    return undefined;
+  }
+  const promptText =
+    selectedText.length > 36
+      ? `Add comment on "${selectedText.slice(0, 33)}..."`
+      : `Add comment on "${selectedText}"`;
+
+  const entered = await vscode.window.showInputBox({
+    prompt: promptText,
+    placeHolder: 'Type your comment and press Enter...'
+  });
+
+  return entered && entered.trim() ? entered.trim() : undefined;
+}
+
 async function addCommentCommand(arg?: unknown) {
   let preferredUri: vscode.Uri | undefined;
   let passedSelectedText: string | undefined;
+  let passedContent: string | undefined;
   let openSidebar = false;
 
   if (arg) {
@@ -1249,6 +1300,7 @@ async function addCommentCommand(arg?: unknown) {
       const obj = arg as {
         uri?: unknown;
         selectedText?: unknown;
+        content?: unknown;
         openSidebar?: unknown;
       };
       if (obj.uri) {
@@ -1256,6 +1308,9 @@ async function addCommentCommand(arg?: unknown) {
       }
       if (typeof obj.selectedText === 'string' && obj.selectedText.trim()) {
         passedSelectedText = cleanCopiedSelection(obj.selectedText);
+      }
+      if (typeof obj.content === 'string' && obj.content.trim()) {
+        passedContent = obj.content.trim();
       }
       if (typeof obj.openSidebar === 'boolean') {
         openSidebar = obj.openSidebar;
@@ -1283,13 +1338,22 @@ async function addCommentCommand(arg?: unknown) {
 
     const selectedText = ctx.editor.document.getText(selection);
 
-    // Update form state in background for unit/e2e tests
-    sidebarProvider.showAddCommentForm(true, selectedText, false);
-    if (!openSidebar) {
-      // Open native in-editor comment widget at cursor/selection
-      await vscode.commands
-        .executeCommand('workbench.action.addComment')
-        .then(undefined, () => {});
+    if (openSidebar) {
+      sidebarProvider.showAddCommentForm(true, selectedText, true);
+      return;
+    }
+
+    const commentBody = passedContent || (await promptForTextEditorCommentContent(selectedText));
+    if (!commentBody) {
+      sidebarProvider.showAddCommentForm(true, selectedText, false);
+      return;
+    }
+
+    const comment = await commentService.addComment(ctx.document, selection, commentBody);
+    if (comment) {
+      await saveDocumentIfCustomEditor(ctx);
+      await refreshForContext(ctx.document, ctx.editor);
+      vscode.window.showInformationMessage('Comment added');
     }
   } else {
     // Custom editor / viewer mode (e.g., "Markdown Editor")

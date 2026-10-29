@@ -92,16 +92,18 @@ function processFenceTokens(
   }
 }
 
-function processInlineTokens(
-  tokens: Token[],
-  lineComments: Map<number, Comment[]>,
-  TokenCtor: TokenConstructor
-): void {
-  for (const token of tokens) {
-    if (token.type !== 'inline' || !token.children || !token.map) {
-      continue;
-    }
+function isEligibleInlineToken(token: Token): boolean {
+  return token.type === 'inline' && Boolean(token.children && token.children.length > 0);
+}
 
+// Invariant: Resolves comments relevant to an inline token via line map or fallback anchor text match.
+// Why: Table cells and nested list items often have null token.map; fallback guarantees preview highlights.
+// Example: Table cell without map matching anchor text "architecture" receives highlight span.
+function resolveCommentsForInlineToken(
+  token: Token,
+  lineComments: Map<number, Comment[]>
+): Comment[] {
+  if (token.map) {
     const [startLine, endLine] = token.map;
     const relevantComments: Comment[] = [];
     for (let line = startLine; line < endLine; line++) {
@@ -114,7 +116,32 @@ function processInlineTokens(
         }
       }
     }
+    return relevantComments;
+  }
 
+  const matched: Comment[] = [];
+  const textContent = (token.children || []).map(ch => ch.content || '').join(' ');
+  for (const comments of lineComments.values()) {
+    for (const c of comments) {
+      if (!matched.includes(c) && textContent.includes(c.anchor.text)) {
+        matched.push(c);
+      }
+    }
+  }
+  return matched;
+}
+
+function processInlineTokens(
+  tokens: Token[],
+  lineComments: Map<number, Comment[]>,
+  TokenCtor: TokenConstructor
+): void {
+  for (const token of tokens) {
+    if (!isEligibleInlineToken(token)) {
+      continue;
+    }
+
+    const relevantComments = resolveCommentsForInlineToken(token, lineComments);
     if (relevantComments.length === 0) {
       continue;
     }
@@ -123,7 +150,7 @@ function processInlineTokens(
       const anchorText = comment.anchor.text;
       const newChildren: Token[] = [];
 
-      for (const child of token.children) {
+      for (const child of token.children!) {
         if (child.type !== 'text' || !child.content.includes(anchorText)) {
           newChildren.push(child);
           continue;

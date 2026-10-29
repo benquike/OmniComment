@@ -123,6 +123,48 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     assert.strictEqual(selectedText, 'expansion');
   });
 
+  // Topology: text selection in TextEditor -> omnicomment.addComment({ content }) -> CommentService.addComment
+  // Expected: comment persisted to document storage block, inline thread created, selection decorated.
+  test('Mode 1D: Standard TextEditor omnicomment.addComment with direct content', async () => {
+    const filePath = path.join(tempDir, 'mode1-direct-add.md');
+    fs.writeFileSync(
+      filePath,
+      '# Direct Comment Test\n\nVerifying direct comment submission in TextEditor.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    const term = 'Verifying';
+    const startIdx = document.lineAt(2).text.indexOf(term);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(2, startIdx),
+      new vscode.Position(2, startIdx + term.length)
+    );
+
+    const commentText = 'Direct text editor comment via command';
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: commentText
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 1;
+    });
+
+    const comments = commentService.parseComments(document);
+    assert.strictEqual(comments.length, 1);
+    assert.strictEqual(comments[0].anchor.text, term);
+    assert.strictEqual(comments[0].content, commentText);
+
+    // Verify inline controller thread
+    const inlineController = getInlineCommentControllerForTesting();
+    assert.strictEqual(inlineController.getThreadCount(fileUri), 1);
+  });
+
   // MODE 1C: SKILL file mode (.skill language/extension)
   test('Mode 1C: Skill document (.skill) support in standard editor', async () => {
     const filePath = path.join(tempDir, 'agent-rules.skill');
@@ -230,6 +272,60 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     };
     exports.extendMarkdownIt(fakeMd);
     assert.strictEqual(fakeMd.usedPlugin, true, 'extendMarkdownIt should register the preview plugin');
+  });
+
+  // Topology: MarkdownIt with null map tokens -> omniCommentPreviewPlugin -> HTML highlight tags
+  // Expected: Inline tokens without map (tables/lists) are decorated with .omni-highlight.
+  test('Mode 3B: Markdown Preview plugin highlights inline tokens without map', () => {
+    const ext = vscode.extensions.getExtension('benquike.omnicomment');
+    assert.ok(ext);
+    const exports = ext.exports;
+
+    let registeredPlugin: any = null;
+    const fakeMd = {
+      core: {
+        ruler: {
+          push(_name: string, fn: any) {
+            registeredPlugin = fn;
+          }
+        }
+      },
+      use(plugin: any) {
+        plugin(this);
+        return this;
+      }
+    };
+
+    exports.extendMarkdownIt(fakeMd);
+    assert.ok(registeredPlugin, 'Plugin rule should be registered');
+
+    // Mock state with inline token without map matching a comment anchor
+    class MockToken {
+      constructor(public type: string, public tag: string, public nesting: number) {}
+      content = '';
+      map: [number, number] | null = null;
+      children: MockToken[] | null = null;
+    }
+
+    const textChild = new MockToken('text', '', 0);
+    textChild.content = 'Table cell architecture text';
+
+    const inlineToken = new MockToken('inline', '', 0);
+    inlineToken.map = null;
+    inlineToken.children = [textChild];
+
+    const state = {
+      src: '# Table Test\n\n| Col |\n| --- |\n| architecture |\n\n<!-- omnicomment\n{"version":2,"comments":[{"id":"c1","anchor":{"text":"architecture","startLine":4,"startChar":2,"endLine":4,"endChar":14},"content":"Cell review","author":"user","createdAt":"2026-10-29T00:00:00.000Z"}]}\n-->',
+      tokens: [inlineToken],
+      Token: MockToken
+    };
+
+    registeredPlugin(state);
+
+    const hasHighlight = inlineToken.children.some(
+      ch => ch.type === 'html_inline' && ch.content.includes('omni-highlight')
+    );
+    assert.strictEqual(hasHighlight, true, 'Inline token without map should receive omni-highlight');
   });
 
   // MODE 4: Custom Editor Mode ("Markdown Editor" / cweijan.markdownViewer)

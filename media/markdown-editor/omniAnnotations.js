@@ -433,7 +433,7 @@ function buildDomTextMap(container) {
         if (!parent) return NodeFilter.FILTER_REJECT;
         if (
           parent.closest(
-            '.vditor-editor-boundary, .vditor-wysiwyg__marker, .vditor-ir__marker, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
+            '.vditor-editor-boundary, .vditor-wysiwyg__marker, .vditor-ir__marker, .vditor-ir__preview, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
           )
         ) {
           return NodeFilter.FILTER_REJECT;
@@ -1920,9 +1920,9 @@ export function initOmniAnnotations(getMarkdownValue) {
       if (modeChanged) {
         if (modeDebounceTimer) clearTimeout(modeDebounceTimer);
         modeDebounceTimer = setTimeout(() => {
-          renderInlineZones();
+          refreshHighlights();
           syncZonePositions();
-        }, 60);
+        }, 80);
       }
     });
     mo.observe(rootEl, {
