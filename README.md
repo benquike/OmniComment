@@ -21,26 +21,31 @@ Universal commenting, inline highlight, and thread annotation system for editors
 ## Screenshots
 
 ### 1. In-Editor Comment Threads & Sidebar Navigation
+
 Interactive sidebar listing active and resolved comment threads, author attributions, thumbs-up counters, two-way cursor synchronization, and gutter comment indicators.
 
 ![Comment Sidebar & Editor Highlights](media/screenshot1.png)
 
 ### 2. In-Situ Dynamic Annotation Zones (WYSIWYG & TextEditor)
+
 Comments embed directly beneath the annotated block with resolution workflows, collapsible threaded responses, and quick reply actions.
 
 ![In-Situ Inline Comment Widget](media/screenshot-inline-widget.png)
 
 ### 3. Live Markdown Preview Highlighting
+
 In-situ highlight rendering in the VS Code Markdown preview with hover tooltips, comment count badges, and reaction indicators.
 
 ![Markdown Preview Highlighting](media/preview-screenshot.png)
 
 ### 4. One-Click Configuration Presets
+
 Quickly switch between pre-configured operational profiles via the VS Code Command Palette (`OmniComment: Apply Preset Configuration...`).
 
 ![Configuration Presets](media/screenshot-presets.png)
 
 ### 5. Autonomous AI Agent Review & Suggestion Diff
+
 Headless Agent APIs (`omnicomment.agent.*`) empower automated review agents to post structured feedback and code suggestions directly into the editor.
 
 ![AI Agent Review & Suggestion Diff](media/screenshot-agent-review.png)
@@ -63,16 +68,17 @@ Headless Agent APIs (`omnicomment.agent.*`) empower automated review agents to p
 
 OmniComment provides 5 purpose-built presets to minimize configuration effort:
 
-| Preset | Target Use Case | UI Density & Features |
-| :--- | :--- | :--- |
-| `default` | Standard VS Code editing | Balanced inline chips and sidebar panel |
-| `documentation-site` | Public docs, Docusaurus, VitePress | Floating bubbles, lightweight chips, non-distracting reading |
-| `git-file-review` | Code reviews and git diffs | Line-level anchoring, side-by-side threads, strict diff tracking |
-| `browser-annotator` | Chrome extension / Web research | High-contrast highlights, floating thread overlay, browser sync |
-| `team-collaboration` | Engineering teams | Full avatar badges, reaction counters, multi-user resolution |
-| `ai-agent-reviewer` | AI agent workflows | Agent badges, automated check hooks, structured JSON output |
+| Preset                 | Target Use Case                    | UI Density & Features                                            |
+| :--------------------- | :--------------------------------- | :--------------------------------------------------------------- |
+| `default`              | Standard VS Code editing           | Balanced inline chips and sidebar panel                          |
+| `documentation-site`   | Public docs, Docusaurus, VitePress | Floating bubbles, lightweight chips, non-distracting reading     |
+| `git-file-review`      | Code reviews and git diffs         | Line-level anchoring, side-by-side threads, strict diff tracking |
+| `browser-annotator`    | Chrome extension / Web research    | High-contrast highlights, floating thread overlay, browser sync  |
+| `team-collaboration`   | Engineering teams                  | Full avatar badges, reaction counters, multi-user resolution     |
+| `ai-agent-reviewer`    | AI agent workflows                 | Agent badges, automated check hooks, structured JSON output      |
 
 To switch presets:
+
 1. Run `OmniComment: Apply Preset Configuration...` (`omnicomment.applyPreset`) from the Command Palette.
 2. Or set `"omnicomment.preset": "ai-agent-reviewer"` in your VS Code `settings.json`.
 
@@ -83,6 +89,7 @@ To switch presets:
 OmniComment exposes first-class VS Code commands for autonomous AI agents and automated scripting:
 
 ### 1. Retrieve Comments (`omnicomment.agent.getComments`)
+
 ```typescript
 const comments = await vscode.commands.executeCommand('omnicomment.agent.getComments', {
   uri?: string | vscode.Uri,      // Optional document URI (defaults to active editor)
@@ -91,6 +98,7 @@ const comments = await vscode.commands.executeCommand('omnicomment.agent.getComm
 ```
 
 ### 2. Post a New Comment (`omnicomment.agent.postComment`)
+
 ```typescript
 const comment = await vscode.commands.executeCommand('omnicomment.agent.postComment', {
   uri?: string | vscode.Uri,
@@ -101,6 +109,7 @@ const comment = await vscode.commands.executeCommand('omnicomment.agent.postComm
 ```
 
 ### 3. Reply to a Thread (`omnicomment.agent.replyComment`)
+
 ```typescript
 const reply = await vscode.commands.executeCommand('omnicomment.agent.replyComment', {
   uri?: string | vscode.Uri,
@@ -111,6 +120,7 @@ const reply = await vscode.commands.executeCommand('omnicomment.agent.replyComme
 ```
 
 ### 4. Resolve or Reopen a Thread (`omnicomment.agent.resolveComment`)
+
 ```typescript
 const updated = await vscode.commands.executeCommand('omnicomment.agent.resolveComment', {
   uri?: string | vscode.Uri,
@@ -120,6 +130,7 @@ const updated = await vscode.commands.executeCommand('omnicomment.agent.resolveC
 ```
 
 ### 5. Delete a Comment (`omnicomment.agent.deleteComment`)
+
 ```typescript
 const result = await vscode.commands.executeCommand('omnicomment.agent.deleteComment', {
   uri?: string | vscode.Uri,
@@ -131,11 +142,11 @@ const result = await vscode.commands.executeCommand('omnicomment.agent.deleteCom
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-| -------- | ------ |
-| `Ctrl+Shift+M` / `Cmd+Shift+M` | Add comment to selection or word at cursor |
-| `Ctrl+Enter` / `Cmd+Enter` | Submit comment or reply in sidebar / inline widget |
-| `Escape` | Cancel editing or dismiss active comment form |
+| Shortcut                           | Action                                             |
+| ---------------------------------- | -------------------------------------------------- |
+| `Ctrl+Shift+M` / `Cmd+Shift+M` | Add comment to selection or word at cursor         |
+| `Ctrl+Enter` / `Cmd+Enter`     | Submit comment or reply in sidebar / inline widget |
+| `Escape`                         | Cancel editing or dismiss active comment form      |
 
 ---
 
@@ -178,13 +189,13 @@ Comprehensive guides and tutorials are available in the [`docs/`](docs/README.md
 - 🎓 **[Hands-on Tutorial](docs/TUTORIAL.md)**: Step-by-step guide from zero to hero across VS Code, presets, web embedding, browser extensions, and AI reviewer agents.
 - 💻 **[Web Applications Guide](docs/WEBAPP_GUIDE.md)**: React, Next.js, Vue 3, Nuxt, Svelte 5, SvelteKit, Web Component (`<omni-comment>`), real-time sync (Supabase, WebSockets), and offline IndexedDB.
 - 🧩 **[Chrome Extension Guide](docs/CHROME_EXTENSION_GUIDE.md)**: Manifest V3 browser extension, live web page annotation with W3C TextQuoteSelector, Shadow DOM style isolation, and local VS Code bridge.
-- 📟 **[Terminal & TUI Apps Guide](docs/TUI_APPS_GUIDE.md)**: Headless CLI commands (`omnicomment-cli`), Neovim Lua plugin using `virt_lines` extmarks, Python Textual, Go Bubbletea, and Git pre-commit hooks.
+- 📟 **[Terminal &amp; TUI Apps Guide](docs/TUI_APPS_GUIDE.md)**: Headless CLI commands (`omnicomment-cli`), Neovim Lua plugin using `virt_lines` extmarks, Python Textual, Go Bubbletea, and Git pre-commit hooks.
 - 📝 **[VS Code Editor Modes Guide](docs/VSCODE_MODES_GUIDE.md)**: Standard TextEditor, Vditor WYSIWYG Custom Editor, Jupyter Notebooks (`.ipynb`), Git split/unified diff reviews, and split panes.
 - 📚 **[Comprehensive API Reference](docs/API_REFERENCE.md)**: Formal API specification for data structures (`Comment`, `Reply`, `CommentAnchor`), commands, TypeScript core classes, and `<omni-comment>`.
 - 🤖 **[AI Agent API Guide](docs/AGENT_API.md)**: Programmatic APIs for AI agents, MCP tool schemas, automated review loops, and LLM prompt context builders.
 - 🌐 **[Integration Guide](docs/INTEGRATION_GUIDE.md)**: Embedding OmniComment into static site generators (Docusaurus, VitePress, Hugo), documentation hubs, and external frameworks.
-- ⚙️ **[Configuration & Presets Guide](docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
-- 🏗️ **[Architecture & Data Model](docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
+- ⚙️ **[Configuration &amp; Presets Guide](docs/CONFIGURATION_PRESETS.md)**: The 5 built-in presets (`documentation-site`, `git-file-review`, `browser-annotator`, `team-collaboration`, `ai-agent-reviewer`), UI design tokens, and storage backends.
+- 🏗️ **[Architecture &amp; Data Model](docs/ARCHITECTURE.md)**: System design, W3C Web Annotation data models, and 3-tier robust anchoring engine.
 
 ---
 
@@ -193,22 +204,27 @@ Comprehensive guides and tutorials are available in the [`docs/`](docs/README.md
 OmniComment includes a built-in static site generator ([`scripts/render-docs.js`](scripts/render-docs.js)) that compiles the Markdown guides into a responsive documentation website featuring sidebar navigation, Prism syntax highlighting, live Mermaid diagrams, GitHub callout alerts, and an active Table of Contents.
 
 ### 1. Build the Static Site
+
 ```bash
 npm run docs:build
 # or directly:
 node scripts/render-docs.js
 ```
+
 The compiled HTML site is output to `dist/site/index.html`.
 
 ### 2. Launch Local Preview Server
+
 ```bash
 npm run docs:serve
 # or with a custom port:
 node scripts/render-docs.js --serve --port=8080
 ```
+
 Open [http://localhost:3000](http://localhost:3000) in your browser to explore the rendered documentation portal.
 
 ### 3. Render a Single Markdown File
+
 ```bash
 node scripts/render-docs.js path/to/file.md
 ```
