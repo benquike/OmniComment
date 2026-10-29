@@ -1,6 +1,6 @@
 # OmniComment Server Frameworks & Backend Integration Guide
 
-Comprehensive guide for implementing, deploying, and maintaining **OmniComment** comment persistence backends across modern server-side languages and web frameworks, including **Python (FastAPI & Flask)**, **Go (Gin & net/http)**, **PHP (Modern PHP 8 & Laravel)**, **Angular SSR (Express & Node.js)**, **Node.js (Express)**, and **Java (Spring Boot)**.
+Comprehensive guide for implementing, deploying, and maintaining **OmniComment** comment persistence backends across modern server-side languages and web frameworks, including **Python (FastAPI & Flask)**, **Go (Gin & net/http)**, **PHP (Modern PHP 8 & Laravel)**, **Ruby (Sinatra, WEBrick & Rails)**, **Angular SSR (Express & Node.js)**, **Node.js (Express)**, and **Java (Spring Boot)**.
 
 ---
 
@@ -18,9 +18,10 @@ Comprehensive guide for implementing, deploying, and maintaining **OmniComment**
    - [Modern Standalone PHP 8.2+ (PDO SQLite)](#modern-standalone-php-82-pdo-sqlite)
    - [Laravel 10 & 11 (Eloquent & Route Controller)](#laravel-10--11-eloquent--route-controller)
 6. [Angular SSR & Express Application Server](#6-angular-ssr--express-application-server)
-7. [Other Frameworks (Node.js Express & Java Spring Boot)](#7-other-frameworks-nodejs-express--java-spring-boot)
-8. [Client Integration with @omnicomment/web-plugin](#8-client-integration-with-omnicommentweb-plugin)
-9. [Security, Authentication & Production Hardening](#9-security-authentication--production-hardening)
+7. [Ruby Backend Implementations (Sinatra, WEBrick & Rails)](#7-ruby-backend-implementations-sinatra-webrick--rails)
+8. [Other Frameworks (Node.js Express & Java Spring Boot)](#8-other-frameworks-nodejs-express--java-spring-boot)
+9. [Client Integration with @omnicomment/web-plugin](#9-client-integration-with-omnicommentweb-plugin)
+10. [Security, Authentication & Production Hardening](#10-security-authentication--production-hardening)
 
 ---
 
@@ -44,6 +45,7 @@ flowchart LR
         PY["Python\n(FastAPI / Flask)"]
         GO["Go\n(Gin / net/http)"]
         PHP["PHP\n(PHP 8.2+ / Laravel)"]
+        RUBY["Ruby\n(Sinatra / Rails)"]
         ANGULAR["Angular SSR\n(server.ts / Express)"]
         NODE["Node.js\n(Express / NestJS)"]
     end
@@ -58,11 +60,13 @@ flowchart LR
     AUTH --> PY
     AUTH --> GO
     AUTH --> PHP
+    AUTH --> RUBY
     AUTH --> ANGULAR
     AUTH --> NODE
     PY --> SQLITE
     GO --> JSONSTORE
     PHP --> SQLITE
+    RUBY --> JSONSTORE
     ANGULAR --> JSONSTORE
     NODE --> PG
 ```
@@ -497,7 +501,95 @@ npm run serve
 
 ---
 
-## 7. Other Frameworks (Node.js Express & Java Spring Boot)
+## 7. Ruby Backend Implementations (Sinatra, WEBrick & Rails)
+
+Ready-to-run source code is located in [`servers/ruby/`](../servers/ruby/).
+
+OmniComment provides flexible Ruby backends ranging from zero-dependency standard library execution to Sinatra / Puma microservices and full-featured Ruby on Rails API controllers.
+
+### 1. Standalone Zero-Dependency WEBrick Server (`server.rb`)
+Runs out of the box using Ruby's built-in standard library:
+
+```ruby
+# servers/ruby/server.rb
+require 'webrick'
+require 'json'
+require 'time'
+
+PORT = (ENV['PORT'] || 8000).to_i
+
+# Concurrency-safe in-memory store with atomic JSON disk persistence
+class OmniCommentServlet < WEBrick::HTTPServlet::AbstractServlet
+  def do_GET(req, res)
+    # List comments or get single comment...
+  end
+
+  def do_POST(req, res)
+    # Create comment thread or append reply...
+  end
+end
+
+server = WEBrick::HTTPServer.new(Port: PORT)
+server.mount '/', OmniCommentServlet
+server.start
+```
+
+### 2. Sinatra & Puma REST API (`app.rb`)
+For high-concurrency production deployments:
+
+```ruby
+# servers/ruby/app.rb
+require 'sinatra'
+require 'json'
+require 'time'
+
+set :port, ENV['PORT'] || 8000
+set :bind, '0.0.0.0'
+
+get '/api/documents/:doc_id/comments' do
+  doc_id = params['doc_id']
+  include_resolved = params['includeResolved'] != 'false'
+  comments = load_comments(doc_id, include_resolved: include_resolved)
+  { success: true, count: comments.size, comments: comments }.to_json
+end
+
+post '/api/documents/:doc_id/comments' do
+  doc_id = params['doc_id']
+  payload = JSON.parse(request.body.read)
+  comment = create_comment(doc_id, payload)
+  status 201
+  { success: true, comment: comment }.to_json
+end
+```
+
+### 3. Ruby on Rails Controller (`rails/comments_controller.rb`)
+Drop-in controller for Rails 7 & 8 applications located in [`servers/ruby/rails/comments_controller.rb`](../servers/ruby/rails/comments_controller.rb):
+
+```ruby
+# config/routes.rb
+namespace :api do
+  resources :documents, only: [] do
+    resources :comments, only: [:index, :show, :create, :update, :destroy] do
+      post :replies, on: :member, to: 'comments#add_reply'
+    end
+  end
+end
+```
+
+### 4. Quickstart
+```bash
+cd servers/ruby
+
+# Option A: Zero-dependency immediate run
+ruby server.rb
+
+# Option B: Sinatra with Puma
+bundle install && bundle exec rackup -p 8000
+```
+
+---
+
+## 8. Other Frameworks (Node.js Express & Java Spring Boot)
 
 ### Node.js Express
 
@@ -560,7 +652,7 @@ public class OmniCommentController {
 
 ---
 
-## 8. Client Integration with `@omnicomment/web-plugin`
+## 9. Client Integration with `@omnicomment/web-plugin`
 
 Connecting `@omnicomment/web-plugin` to any of the above backends requires just specifying the REST storage configuration:
 
@@ -591,7 +683,7 @@ const omni = initOmniComment({
 
 ---
 
-## 9. Security, Authentication & Production Hardening
+## 10. Security, Authentication & Production Hardening
 
 ### 1. JWT Authentication Middleware
 Ensure only authenticated users can create or modify comments:
