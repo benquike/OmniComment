@@ -228,6 +228,22 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
       assert.strictEqual(afterExpandThread!.visibleThreadCount, 1);
       assert.strictEqual(afterExpandThread!.zoneCount, 1);
 
+      // Verify resolving comment in custom editor clears text highlighting
+      const afterResolve = await queryMarkdownEditorInlineStateForTesting(
+        '[data-action="toggle-resolve"]'
+      );
+      assert.ok(afterResolve);
+      assert.strictEqual(afterResolve!.threads[0].isResolved, true);
+      assert.strictEqual(afterResolve!.highlightCount, 0);
+
+      // Verify reopening comment restores text highlighting
+      const afterReopen = await queryMarkdownEditorInlineStateForTesting(
+        '[data-action="toggle-resolve"]'
+      );
+      assert.ok(afterReopen);
+      assert.strictEqual(afterReopen!.threads[0].isResolved, false);
+      assert.strictEqual(afterReopen!.highlightCount, 1);
+
       // Re-collapse via header chevron to verify the comment box is completely hidden again
       const afterReCollapse = await queryMarkdownEditorInlineStateForTesting(
         '.omni-collapse-chevron'

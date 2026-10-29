@@ -22,7 +22,7 @@ interface TokenConstructor {
 
 function parseCommentsFromSource(src: string): Comment[] {
   const adapter = new MarkdownStorageAdapter();
-  return adapter.parseCommentsFromText(src).filter(c => !c.orphaned);
+  return adapter.parseCommentsFromText(src).filter(c => !c.orphaned && !c.resolved);
 }
 
 function escapeHtml(text: string): string {

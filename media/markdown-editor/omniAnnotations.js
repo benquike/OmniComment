@@ -530,6 +530,9 @@ export function initOmniAnnotations(getMarkdownValue) {
         if (!target) return;
         target.resolved = !target.resolved;
         target.updatedAt = nowIso;
+        if (target.resolved && focusedCommentId === target.id) {
+          focusedCommentId = null;
+        }
         break;
       }
       case 'thumbsUpComment': {
@@ -1402,14 +1405,17 @@ export function initOmniAnnotations(getMarkdownValue) {
                 resolveBlockElement(startPos.node, contentRoot) || fallbackBlock;
               commentRanges.push({ comment, range, blockEl });
 
-              if (comment.id === focusedCommentId) {
-                focusedHighlightRanges.push(range);
-              } else if (!comment.resolved) {
-                normalHighlightRanges.push(range);
-              }
+              // Only highlight text for unresolved comments; when resolved, clear highlight
+              if (!comment.resolved) {
+                if (comment.id === focusedCommentId) {
+                  focusedHighlightRanges.push(range);
+                } else {
+                  normalHighlightRanges.push(range);
+                }
 
-              if (blockEl) {
-                blockCounts.set(blockEl, (blockCounts.get(blockEl) || 0) + 1);
+                if (blockEl) {
+                  blockCounts.set(blockEl, (blockCounts.get(blockEl) || 0) + 1);
+                }
               }
               continue;
             } catch {
@@ -1460,7 +1466,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   function findMatchingItemsAtPoint(clientX, clientY) {
     const matched = [];
     for (const item of commentRanges) {
-      if (!item.range) continue;
+      if (!item.range || item.comment.resolved) continue;
       const rects = item.range.getClientRects();
       for (const rect of rects) {
         if (
@@ -1647,6 +1653,11 @@ export function initOmniAnnotations(getMarkdownValue) {
       totalZoneCount: activeZones.length,
       threadCount: threads.length,
       visibleThreadCount: threads.filter(t => !t.isHidden).length,
+      highlightCount:
+        (window.CSS && CSS.highlights && window.Highlight)
+          ? (CSS.highlights.get('omni-comment')?.size || 0) +
+            (CSS.highlights.get('omni-comment-focused')?.size || 0)
+          : 0,
       threads
     };
   }

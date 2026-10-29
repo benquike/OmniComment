@@ -1308,8 +1308,14 @@ async function refreshForContext(
   editor?: vscode.TextEditor
 ) {
   const comments = commentService.parseComments(document);
-  if (editor) {
-    commentDecorator.applyDecorations(editor, comments);
+  const matchingEditors = vscode.window.visibleTextEditors.filter(
+    e => e.document.uri.toString() === document.uri.toString()
+  );
+  if (editor && !matchingEditors.some(e => e === editor)) {
+    matchingEditors.push(editor);
+  }
+  for (const e of matchingEditors) {
+    commentDecorator.applyDecorations(e, comments);
   }
   inlineCommentController.syncDocumentComments(document, comments);
   // Sort comments by line number for logical ordering
@@ -1351,6 +1357,7 @@ export async function queryMarkdownEditorInlineStateForTesting(
   totalZoneCount?: number;
   threadCount: number;
   visibleThreadCount?: number;
+  highlightCount?: number;
   threads: Array<{
     commentId: string;
     isCollapsed: boolean;

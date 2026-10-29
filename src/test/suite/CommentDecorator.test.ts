@@ -101,13 +101,13 @@ suite('CommentDecorator Test Suite', () => {
   });
 
   suite('applyDecorations', () => {
-    test('should skip resolved comments', async () => {
+    test('should skip resolved comments and clear highlighting', async () => {
       const editor = await createMockEditor('# Hello World\nSome text');
       const comments: Comment[] = [
         { ...createMockComment('resolved-1', 'Hello', 0, 2, 0, 7), resolved: true }
       ];
       
-      // Should not throw
+      // Applying decorations with only resolved comments leaves highlighting empty
       commentDecorator.applyDecorations(editor, comments);
     });
 

@@ -21,14 +21,18 @@
   background-color: var(--omni-highlight-hover, rgba(255, 212, 0, 0.5));
 }
 
-/* Resolved comments - more subtle styling */
+/* Resolved comments - clear highlighting */
 .omni-highlight.omni-resolved {
-  background-color: rgba(128, 128, 128, 0.2);
-  border-bottom-color: rgba(128, 128, 128, 0.5);
+  background-color: transparent !important;
+  border-bottom: none !important;
 }
 
 .omni-highlight.omni-resolved:hover {
-  background-color: rgba(128, 128, 128, 0.3);
+  background-color: transparent !important;
+}
+
+.omni-highlight.omni-resolved::after {
+  content: none !important;
 }
 
 /* Comment indicator icon (shows small comment icon) */
