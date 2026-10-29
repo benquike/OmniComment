@@ -879,7 +879,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       cssRules.push(
-        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 18}px !important; }`
+        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 8}px !important; }`
       );
     }
 
@@ -897,23 +897,25 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       const blockRect = blockEl.getBoundingClientRect();
-      const top = Math.round(blockRect.bottom + 8);
+      const top = Math.round(blockRect.bottom + 4);
       const left = Math.round(blockRect.left);
-      const width = Math.max(260, Math.round(blockRect.width));
+      const maxCardWidth = 540;
+      const width = Math.min(maxCardWidth, Math.max(320, Math.round(blockRect.width)));
 
       zoneEl.style.top = `${top}px`;
       zoneEl.style.left = `${left}px`;
       zoneEl.style.width = `${width}px`;
+      zoneEl.style.maxWidth = `${maxCardWidth}px`;
 
       const arrowEl = zoneEl.querySelector('.omni-inline-zone__arrow');
       if (arrowEl) {
-        let arrowOffset = 24;
+        let arrowOffset = 20;
         if (anchorRange) {
           const rects = anchorRange.getClientRects();
           if (rects.length > 0) {
             arrowOffset = Math.max(
-              14,
-              Math.min(width - 28, Math.round(rects[0].left - blockRect.left + 10))
+              12,
+              Math.min(width - 24, Math.round(rects[0].left - blockRect.left + 8))
             );
           }
         }
@@ -936,22 +938,22 @@ export function initOmniAnnotations(getMarkdownValue) {
     const thumbsCount = (comment.thumbsUp || []).length;
 
     return `
-      <div class="omni-inline-thread  ${isFocused ? 'is-focused' : ''} ${
+      <div class="omni-inline-thread ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
     }" data-comment-id="${escapeHtml(comment.id)}">
-        <div class="omni-inline-thread omni-inline-thread__header ">
-          <div class="omni-inline-thread omni-inline-thread__header-left ">
-            <span class="omni-inline-thread omni-inline-thread__status  ${
+        <div class="omni-inline-thread__header">
+          <div class="omni-inline-thread__header-left">
+            <span class="omni-inline-thread__status ${
               comment.resolved ? 'is-resolved' : 'is-unresolved'
             }">${statusLabel}</span>
-            <span class="omni-inline-thread omni-inline-thread__anchor-pill " title="Anchored on ${escapeHtml(
+            <span class="omni-inline-thread__anchor-pill" title="Anchored on ${escapeHtml(
               lineLabel
             )}: &quot;${escapeHtml(comment.anchor?.text || '')}&quot;">
               "${escapeHtml(comment.anchor?.text || '')}"
             </span>
           </div>
-          <div class="omni-inline-thread omni-inline-thread__header-actions ">
-            <button type="button" class="omni-inline-header-btn " data-action="toggle-resolve" data-comment-id="${escapeHtml(
+          <div class="omni-inline-thread__header-actions">
+            <button type="button" class="omni-inline-header-btn" data-action="toggle-resolve" data-comment-id="${escapeHtml(
               comment.id
             )}" title="${comment.resolved ? 'Reopen comment' : 'Resolve comment'}">
               <i class="codicon codicon-${comment.resolved ? 'issue-reopened' : 'check'}"></i>
@@ -961,7 +963,7 @@ export function initOmniAnnotations(getMarkdownValue) {
             )}" title="Delete comment thread">
               <i class="codicon codicon-trash"></i>
             </button>
-            <button type="button" class="omni-inline-header-btn omni-collapse-chevron " data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
+            <button type="button" class="omni-inline-header-btn omni-collapse-chevron" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
               comment.id
             )}" title="Collapse comment">
               <i class="codicon codicon-chevron-up"></i>
@@ -969,21 +971,21 @@ export function initOmniAnnotations(getMarkdownValue) {
           </div>
         </div>
 
-        <div class="omni-inline-thread omni-inline-thread__body ">
+        <div class="omni-inline-thread__body">
             <!-- Root Comment -->
-            <div class="omni-inline-item omni-inline-item--root ">
-              <div class="omni-inline-item omni-inline-item__meta ">
-                <span class="omni-inline-item omni-inline-item__author ">${escapeHtml(comment.author)}</span>
-                <span class="omni-inline-item omni-inline-item__time ">${escapeHtml(
+            <div class="omni-inline-item omni-inline-item--root">
+              <div class="omni-inline-item__meta">
+                <span class="omni-inline-item__author">${escapeHtml(comment.author)}</span>
+                <span class="omni-inline-item__time">${escapeHtml(
                   formatRelativeTime(comment.createdAt)
                 )}</span>
-                <div class="omni-inline-item omni-inline-item__actions ">
-                  <button type="button" class="omni-inline-item omni-inline-item-btn " data-action="thumbs-up" data-comment-id="${escapeHtml(
+                <div class="omni-inline-item__actions">
+                  <button type="button" class="omni-inline-item-btn" data-action="thumbs-up" data-comment-id="${escapeHtml(
                     comment.id
                   )}" title="Thumbs up">
                     👍${thumbsCount > 0 ? ` ${thumbsCount}` : ''}
                   </button>
-                  <button type="button" class="omni-inline-item omni-inline-item-btn " data-action="start-edit" data-comment-id="${escapeHtml(
+                  <button type="button" class="omni-inline-item-btn" data-action="start-edit" data-comment-id="${escapeHtml(
                     comment.id
                   )}" title="Edit comment">
                     Edit
@@ -993,13 +995,13 @@ export function initOmniAnnotations(getMarkdownValue) {
               ${
                 isEditing
                   ? `
-                <div class="omni-inline-edit-box ">
+                <div class="omni-inline-edit-box">
                   <textarea id="omni-edit-input-${escapeHtml(
                     comment.id
-                  )}" class="omni-inline-textarea " rows="3">${escapeHtml(
+                  )}" class="omni-inline-textarea" rows="2">${escapeHtml(
                       comment.content
                     )}</textarea>
-                  <div class="omni-inline-form-actions ">
+                  <div class="omni-inline-form-actions">
                     <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-edit" data-comment-id="${escapeHtml(
                       comment.id
                     )}">Cancel</button>
@@ -1009,7 +1011,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                   </div>
                 </div>
               `
-                  : `<div class="omni-inline-item omni-inline-item__text ">${escapeHtml(
+                  : `<div class="omni-inline-item__text">${escapeHtml(
                       comment.content
                     )}</div>`
               }
@@ -1019,8 +1021,8 @@ export function initOmniAnnotations(getMarkdownValue) {
             ${
               replies.length > 0
                 ? `
-              <div class="omni-inline-replies-section ">
-                <button type="button" class="omni-inline-replies-toggle " data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
+              <div class="omni-inline-replies-section">
+                <button type="button" class="omni-inline-replies-toggle" data-action="toggle-collapse-replies" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
                   ${areRepliesCollapsed ? '▸ Show' : '▾ Hide'} ${replies.length} ${
@@ -1031,29 +1033,29 @@ export function initOmniAnnotations(getMarkdownValue) {
                   areRepliesCollapsed
                     ? ''
                     : `
-                  <div class="omni-inline-replies-list ">
+                  <div class="omni-inline-replies-list">
                     ${replies
                       .map(
                         r => `
-                      <div class="omni-inline-item omni-inline-item--reply " data-reply-id="${escapeHtml(
+                      <div class="omni-inline-item omni-inline-item--reply" data-reply-id="${escapeHtml(
                         r.id
                       )}">
-                        <div class="omni-inline-item omni-inline-item__meta ">
-                          <span class="omni-inline-item omni-inline-item__author ">${escapeHtml(
+                        <div class="omni-inline-item__meta">
+                          <span class="omni-inline-item__author">${escapeHtml(
                             r.author
                           )}</span>
-                          <span class="omni-inline-item omni-inline-item__time ">${escapeHtml(
+                          <span class="omni-inline-item__time">${escapeHtml(
                             formatRelativeTime(r.createdAt)
                           )}</span>
-                          <div class="omni-inline-item omni-inline-item__actions ">
-                            <button type="button" class="omni-inline-item omni-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
+                          <div class="omni-inline-item__actions">
+                            <button type="button" class="omni-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
                               comment.id
                             )}" data-reply-id="${escapeHtml(
                               r.id
                             )}" title="Delete response"><i class="codicon codicon-trash"></i></button>
                           </div>
                         </div>
-                        <div class="omni-inline-item omni-inline-item__text ">${escapeHtml(r.content)}</div>
+                        <div class="omni-inline-item__text">${escapeHtml(r.content)}</div>
                       </div>
                     `
                       )
@@ -1067,17 +1069,17 @@ export function initOmniAnnotations(getMarkdownValue) {
             }
 
             <!-- Inline Reply... Box (matching screenshots/inline-comment.png) -->
-            <div class="omni-inline-reply-container " data-reply-container="${escapeHtml(
+            <div class="omni-inline-reply-container" data-reply-container="${escapeHtml(
               comment.id
             )}">
               <textarea
                 id="omni-reply-input-${escapeHtml(comment.id)}"
-                class="omni-inline-reply-input "
+                class="omni-inline-reply-input"
                 rows="1"
                 data-comment-id="${escapeHtml(comment.id)}"
                 placeholder="Reply..."
               ></textarea>
-              <div class="omni-inline-reply-actions ">
+              <div class="omni-inline-reply-actions">
                 <button type="button" class="omni-inline-btn is-secondary" data-action="toggle-resolve" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
@@ -1104,28 +1106,28 @@ export function initOmniAnnotations(getMarkdownValue) {
   function renderNewCommentDraftHtml(draft) {
     return `
       <div class="omni-inline-thread omni-inline-new-comment is-focused">
-        <div class="omni-inline-thread omni-inline-thread__header ">
-          <div class="omni-inline-thread omni-inline-thread__header-left ">
-            <span class="omni-inline-thread omni-inline-thread__status is-unresolved">New Comment</span>
+        <div class="omni-inline-thread__header">
+          <div class="omni-inline-thread__header-left">
+            <span class="omni-inline-thread__status is-unresolved">New Comment</span>
             ${
               draft.anchorText
-                ? `<span class="omni-inline-thread omni-inline-thread__anchor-pill ">"${escapeHtml(
+                ? `<span class="omni-inline-thread__anchor-pill">"${escapeHtml(
                     draft.anchorText
                   )}"</span>`
                 : ''
             }
           </div>
-          <div class="omni-inline-thread omni-inline-thread__header-actions ">
-            <button type="button" class="omni-inline-header-btn " data-action="cancel-new-comment" title="Cancel">✕</button>
+          <div class="omni-inline-thread__header-actions">
+            <button type="button" class="omni-inline-header-btn" data-action="cancel-new-comment" title="Cancel">✕</button>
           </div>
         </div>
-        <div class="omni-inline-thread omni-inline-thread__body ">
+        <div class="omni-inline-thread__body">
           ${
             !draft.anchorText
               ? `
-            <div class="omni-inline-field ">
-              <label class="omni-inline-label ">Target text in Markdown:</label>
-              <input id="omni-inline-new-comment-anchor" class="omni-inline-anchor-input " type="text" placeholder="Enter target phrase from document..." value="" />
+            <div class="omni-inline-field">
+              <label class="omni-inline-label">Target text in Markdown:</label>
+              <input id="omni-inline-new-comment-anchor" class="omni-inline-anchor-input" type="text" placeholder="Enter target phrase from document..." value="" />
             </div>
           `
               : `<input id="omni-inline-new-comment-anchor" type="hidden" value="${escapeHtml(
@@ -1134,11 +1136,11 @@ export function initOmniAnnotations(getMarkdownValue) {
           }
           <textarea
             id="omni-inline-new-comment-input"
-            class="omni-inline-textarea "
-            rows="3"
+            class="omni-inline-textarea"
+            rows="2"
             placeholder="Add a comment... (Ctrl+Enter to save)"
           ></textarea>
-          <div class="omni-inline-form-actions ">
+          <div class="omni-inline-form-actions">
             <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-new-comment">Cancel</button>
             <button type="button" class="omni-inline-btn is-primary" data-action="submit-new-comment">Comment</button>
           </div>
