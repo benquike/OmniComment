@@ -57,7 +57,8 @@ export class InlineCommentController implements vscode.Disposable {
           document.languageId === 'markdown' ||
           document.languageId === 'skill' ||
           document.languageId === 'plaintext' ||
-          document.languageId === 'text';
+          document.languageId === 'text' ||
+          document.languageId === 'log';
         const lowerPath = document.uri.path.toLowerCase();
         const isSupportedFile = [
           '.md',
@@ -67,7 +68,8 @@ export class InlineCommentController implements vscode.Disposable {
           '.mkd',
           '.skill',
           '.txt',
-          '.text'
+          '.text',
+          '.log'
         ].some(ext => lowerPath.endsWith(ext));
         if (!isSupportedLang && !isSupportedFile) {
           return [];

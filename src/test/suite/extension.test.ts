@@ -66,14 +66,15 @@ suite('Extension Test Suite', () => {
   });
 
   suite('Language Compatibility', () => {
-    test('Should treat skill and plaintext languages as compatible', () => {
+    test('Should treat skill, plaintext, and log languages as compatible', () => {
       assert.strictEqual(isMarkdownCompatibleLanguage('markdown'), true);
       assert.strictEqual(isMarkdownCompatibleLanguage('skill'), true);
       assert.strictEqual(isMarkdownCompatibleLanguage('plaintext'), true);
+      assert.strictEqual(isMarkdownCompatibleLanguage('log'), true);
       assert.strictEqual(isMarkdownCompatibleLanguage('typescript'), false);
     });
 
-    test('Package contribution contexts should include skill and plaintext languages', () => {
+    test('Package contribution contexts should include skill, plaintext, and log languages', () => {
       const extension =
         vscode.extensions.getExtension('benquike.omnicomment') ||
         vscode.extensions.getExtension('OrenMaoz.omnicomment');
@@ -85,6 +86,7 @@ suite('Extension Test Suite', () => {
 
       assert.ok(packageJson.activationEvents.includes('onLanguage:skill'));
       assert.ok(packageJson.activationEvents.includes('onLanguage:plaintext'));
+      assert.ok(packageJson.activationEvents.includes('onLanguage:log'));
 
       const editorContextMenuItem = packageJson.contributes.menus['editor/context'].find(
         (item: { command: string }) => item.command === 'omnicomment.addComment'
@@ -106,15 +108,15 @@ suite('Extension Test Suite', () => {
 
       assert.strictEqual(
         editorContextWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log'
       );
       assert.strictEqual(
         editorTitleWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
       assert.strictEqual(
         keybindingWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
     });
 
@@ -122,11 +124,14 @@ suite('Extension Test Suite', () => {
       const mdUri = vscode.Uri.file('/workspace/docs/README.md');
       const skillUri = vscode.Uri.file('/workspace/skills/SKILL.skill');
       const txtUri = vscode.Uri.file('/workspace/docs/notes.txt');
+      const logUri = vscode.Uri.file('/workspace/logs/server.log');
       const tsUri = vscode.Uri.file('/workspace/src/index.ts');
 
       assert.strictEqual(isMarkdownCompatibleUri(mdUri), true);
       assert.strictEqual(isMarkdownCompatibleUri(skillUri), true);
       assert.strictEqual(isMarkdownCompatibleUri(txtUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(logUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
       assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
       assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
 

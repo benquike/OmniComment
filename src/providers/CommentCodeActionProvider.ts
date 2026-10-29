@@ -8,7 +8,8 @@ export function isSupportedDocumentLanguage(languageId: string): boolean {
     languageId === 'markdown' ||
     languageId === 'skill' ||
     languageId === 'plaintext' ||
-    languageId === 'text'
+    languageId === 'text' ||
+    languageId === 'log'
   );
 }
 

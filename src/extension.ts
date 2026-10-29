@@ -113,7 +113,8 @@ const MARKDOWN_EXTENSIONS = [
   '.mdtext',
   '.skill',
   '.txt',
-  '.text'
+  '.text',
+  '.log'
 ];
 
 export function isMarkdownCompatibleLanguage(languageId: string): boolean {
@@ -121,7 +122,8 @@ export function isMarkdownCompatibleLanguage(languageId: string): boolean {
     languageId === 'markdown' ||
     languageId === 'skill' ||
     languageId === 'plaintext' ||
-    languageId === 'text'
+    languageId === 'text' ||
+    languageId === 'log'
   );
 }
 
@@ -624,7 +626,8 @@ export function activate(context: vscode.ExtensionContext) {
         { language: 'skill' },
         { language: 'plaintext' },
         { language: 'text' },
-        { pattern: '**/*.{txt,text,md,markdown,skill}' }
+        { language: 'log' },
+        { pattern: '**/*.{txt,text,md,markdown,skill,log}' }
       ],
       new CommentCodeActionProvider(),
       {

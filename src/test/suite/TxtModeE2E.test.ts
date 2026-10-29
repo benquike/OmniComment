@@ -230,4 +230,100 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     await waitForCondition(() => commentService.parseComments(document).length === 0);
     assert.strictEqual(inlineController.getThreadCount(fileUri), 0);
   });
+
+  // Topology: xxx.log file -> openTextDocument -> text selection -> addComment -> reply -> resolve
+  // Expected: xxx.log document resolves in getActiveMarkdownContext, comment persists in comment block, inline thread created.
+  test('Log 1: Log file (xxx.log) full commenting lifecycle, action provider, and thread verification', async () => {
+    const filePath = path.join(tempDir, 'xxx.log');
+    fs.writeFileSync(
+      filePath,
+      '2026-10-29 15:48:00 [INFO] Starting telemetry service on port 9090\n' +
+      '2026-10-29 15:48:01 [WARN] Slow database query detected: duration=450ms\n' +
+      '2026-10-29 15:48:02 [ERROR] Fatal database connection error: connection pool exhausted\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    const ctx = await getActiveMarkdownContext(fileUri);
+    assert.ok(ctx, 'Log file (xxx.log) must resolve in getActiveMarkdownContext');
+    assert.strictEqual(ctx?.document.uri.fsPath, fileUri.fsPath);
+
+    // CodeAction verification on xxx.log
+    const provider = new CommentCodeActionProvider();
+    const targetPhrase = 'connection pool exhausted';
+    const lineIndex = 2;
+    const startChar = document.lineAt(lineIndex).text.indexOf(targetPhrase);
+    assert.ok(startChar !== -1);
+    const selection = new vscode.Selection(
+      new vscode.Position(lineIndex, startChar),
+      new vscode.Position(lineIndex, startChar + targetPhrase.length)
+    );
+    editor.selection = selection;
+
+    const actions = provider.provideCodeActions(
+      document,
+      selection,
+      { diagnostics: [], triggerKind: vscode.CodeActionTriggerKind.Invoke, only: undefined },
+      new vscode.CancellationTokenSource().token
+    );
+    assert.ok(actions.length > 0, 'CodeActionProvider must provide action for xxx.log selection');
+    const firstAction = actions[0] as vscode.CodeAction;
+    assert.ok(firstAction.title.includes('Add OmniComment'));
+
+    // Submit comment on log line
+    const commentBody = 'Root cause: Max connections set too low (size: 10). Increase to 50.';
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: targetPhrase,
+      content: commentBody
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => commentService.parseComments(document).length === 1);
+
+    const comments = commentService.parseComments(document);
+    assert.strictEqual(comments.length, 1);
+    assert.strictEqual(comments[0].anchor.text, targetPhrase);
+    assert.strictEqual(comments[0].content, commentBody);
+
+    // Verify inline controller thread
+    const inlineController = getInlineCommentControllerForTesting();
+    assert.strictEqual(inlineController.getThreadCount(fileUri), 1);
+
+    // Reply to log comment
+    const commentId = comments[0].id;
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addReply',
+      uri: fileUri,
+      commentId,
+      content: 'Config patch applied in staging.'
+    });
+
+    await waitForCondition(() => {
+      const updated = commentService.getComments(document);
+      return Boolean(updated[0]?.replies && updated[0].replies.length === 1);
+    });
+
+    // Resolve log comment
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'resolveComment',
+      uri: fileUri,
+      commentId
+    });
+
+    await waitForCondition(() => {
+      const resolvedList = commentService.getComments(document);
+      return resolvedList[0]?.resolved === true;
+    });
+
+    assert.strictEqual(commentService.getComments(document)[0].resolved, true);
+
+    // Verify file content contains comment block
+    const rawLog = document.getText();
+    assert.ok(rawLog.includes('<!-- omnicomment'), 'Comment block must be stored in xxx.log');
+    assert.ok(rawLog.includes('connection pool exhausted'), 'Anchor must be present');
+  });
 });

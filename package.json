@@ -25,6 +25,7 @@
     "onLanguage:skill",
     "onLanguage:plaintext",
     "onLanguage:text",
+    "onLanguage:log",
     "onCommand:omnicomment.addComment",
     "onCommand:omnicomment.toggleSidebar",
     "onView:omnicomment.commentSidebar",
@@ -155,19 +156,19 @@
     "menus": {
       "editor/context": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text",
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
           "command": "omnicomment.addComment",
           "group": "1_modification@1"
         }
       ],
       "editor/title": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
           "command": "omnicomment.addComment",
           "group": "navigation"
         },
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext",
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log",
           "command": "omnicomment.toggleCollapseAllComments",
           "group": "navigation"
         }
@@ -209,7 +210,7 @@
         "command": "omnicomment.addComment",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
-        "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
+        "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
       }
     ],
     "configuration": {
