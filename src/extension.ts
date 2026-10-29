@@ -550,6 +550,14 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  // Register sidebar webview provider
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      CommentSidebarProvider.viewType,
+      sidebarProvider
+    )
+  );
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand('omnicomment.addComment', addCommentCommand)
@@ -565,9 +573,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('omnicomment.toggleSidebar', async () => {
-      const ctx = await getActiveMarkdownContext();
-      if (ctx) {
-        inlineCommentController.toggleAllThreads(ctx.document.uri);
+      try {
+        await vscode.commands.executeCommand('omnicomment.commentSidebar.focus');
+      } catch {
+        const ctx = await getActiveMarkdownContext();
+        if (ctx) {
+          inlineCommentController.toggleAllThreads(ctx.document.uri);
+        }
       }
     })
   );
@@ -1067,6 +1079,21 @@ export function activate(context: vscode.ExtensionContext) {
       })
     );
   }
+
+  // Listen for document opens
+  context.subscriptions.push(
+    vscode.workspace.onDidOpenTextDocument(async doc => {
+      if (
+        isMarkdownCompatibleLanguage(doc.languageId) ||
+        isMarkdownCompatibleUri(doc.uri)
+      ) {
+        const ctx = await getActiveMarkdownContext();
+        if (ctx && ctx.document.uri.toString() === doc.uri.toString()) {
+          await refreshForContext(ctx.document, ctx.editor);
+        }
+      }
+    })
+  );
 
   // Listen for document changes
   context.subscriptions.push(

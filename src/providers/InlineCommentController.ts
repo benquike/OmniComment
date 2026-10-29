@@ -53,7 +53,12 @@ export class InlineCommentController implements vscode.Disposable {
 
     this._controller.commentingRangeProvider = {
       provideCommentingRanges: (document: vscode.TextDocument) => {
-        if (document.languageId !== 'markdown' && document.languageId !== 'skill') {
+        const isMarkdownLang = document.languageId === 'markdown' || document.languageId === 'skill';
+        const lowerPath = document.uri.path.toLowerCase();
+        const isMarkdownFile = ['.md', '.markdown', '.mdown', '.mkdn', '.mkd', '.skill'].some(ext =>
+          lowerPath.endsWith(ext)
+        );
+        if (!isMarkdownLang && !isMarkdownFile) {
           return [];
         }
         // Invariant: The comment storage block at the bottom of the document should not be commented on.

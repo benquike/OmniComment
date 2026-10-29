@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
+import * as crypto from 'crypto';
 import { Comment, CommentAnchor, Reply } from '../core/types';
 import { AnchorEngine } from '../core/AnchorEngine';
 import { MarkdownStorageAdapter, OMNI_COMMENT_MARKER } from '../storage/MarkdownStorageAdapter';
-import { v4 as uuidv4 } from 'uuid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -131,7 +131,7 @@ export class CommentService {
     const author = await this.getGitUserName(document);
 
     const comment: Comment = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       anchor,
       content,
       author,
@@ -166,7 +166,7 @@ export class CommentService {
     const author = await this.getGitUserName(document);
 
     const comment: Comment = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       anchor,
       content,
       author,
@@ -303,7 +303,7 @@ export class CommentService {
     const author = await this.getGitUserName(document);
 
     const reply: Reply = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       content,
       author,
       createdAt: new Date().toISOString()

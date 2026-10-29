@@ -68,13 +68,18 @@ export class MarkdownStorageAdapter implements IStorageAdapter {
 
   /**
    * Finds the actual comment block position, searching backwards from the end of the text.
-   * Recognizes `<!-- omnicomment`.
+   * Recognizes `<!-- omnicomment` as well as legacy `<!-- markco-comments`, `<!-- markco`, and `<!-- commark-comments`.
    */
   public static findCommentBlock(text: string): CommentBlockLocation | null {
-    // Invariant: Comments are stored in the document using <!-- omnicomment delimiters.
-    // Why: Ensures standard, human-readable storage isolated from code contexts.
-    // Example: <!-- omnicomment\n{...}\n-->
-    const markers = [OMNI_COMMENT_MARKER];
+    // Invariant: Comments are stored in the document using <!-- omnicomment delimiters (with legacy fallback).
+    // Why: Ensures backward compatibility with existing documents while migrating to standard <!-- omnicomment.
+    // Example: <!-- omnicomment\n{...}\n--> or <!-- markco-comments\n{...}\n-->
+    const markers = [
+      OMNI_COMMENT_MARKER,
+      '<!-- markco-comments',
+      '<!-- markco',
+      '<!-- commark-comments'
+    ];
     let latestIndex = -1;
     let latestMarker = '';
 
