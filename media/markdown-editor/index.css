@@ -94,14 +94,14 @@ html[data-editor-theme="Auto"] .vditor-context-menu__separator {
     transition: background-color 0.1s ease;
 }
 
-.vditor-context-menu__item:hover {
+.vditor-context-menu__item:hover,
 .vditor-context-menu__item:focus-visible {
     background: color-mix(in srgb, var(--dropdown-hover-background) 75%, transparent);
     color: var(--front-color);
     outline: none;
 }
 
-html[data-editor-theme="Auto"] .vditor-context-menu__item:hover {
+html[data-editor-theme="Auto"] .vditor-context-menu__item:hover,
 html[data-editor-theme="Auto"] .vditor-context-menu__item:focus-visible {
     background: var(--vscode-menu-selectionBackground, var(--dropdown-hover-background));
     color: var(--vscode-menu-selectionForeground, var(--front-color));
@@ -112,11 +112,11 @@ html[data-editor-theme="Auto"] .vditor-context-menu__item:focus-visible {
     outline-offset: -2px;
 }
 
-.vditor-context-menu__item:disabled {
-.vditor-context-menu__item:disabled:hover {
+.vditor-context-menu__item:disabled,
+.vditor-context-menu__item:disabled:hover,
 .vditor-context-menu__item:disabled:focus-visible,
-body.is-web .vditor-context-menu__item--desktop-only {
-body.is-web .vditor-context-menu__item--desktop-only:hover {
+body.is-web .vditor-context-menu__item--desktop-only,
+body.is-web .vditor-context-menu__item--desktop-only:hover,
 body.is-web .vditor-context-menu__item--desktop-only:focus-visible {
     opacity: 0.45;
     cursor: default;
@@ -125,7 +125,7 @@ body.is-web .vditor-context-menu__item--desktop-only:focus-visible {
     pointer-events: none;
 }
 
-.vditor-context-menu__item:hover .vditor-context-menu__icon .codicon {
+.vditor-context-menu__item:hover .vditor-context-menu__icon .codicon,
 .vditor-context-menu__item:focus-visible .vditor-context-menu__icon .codicon {
     opacity: 1;
 }
@@ -235,7 +235,7 @@ html[data-editor-theme="Auto"] .vditor-context-menu__submenu-panel {
     box-shadow: 0 1px 4px 1px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.2));
 }
 
-.vditor-context-menu__submenu:hover .vditor-context-menu__submenu-panel {
+.vditor-context-menu__submenu:hover .vditor-context-menu__submenu-panel,
 .vditor-context-menu__submenu:focus-within .vditor-context-menu__submenu-panel {
     display: flex;
     flex-direction: column;
@@ -707,7 +707,7 @@ html[data-editor-theme]:not([data-editor-theme="Auto"]) {
     -moz-appearance: textfield;
 }
 
-.vditor-pdf-export-select--number::-webkit-outer-spin-button {
+.vditor-pdf-export-select--number::-webkit-outer-spin-button,
 .vditor-pdf-export-select--number::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
@@ -737,7 +737,7 @@ html[data-editor-theme]:not([data-editor-theme="Auto"]) {
     transition: border-color 0.15s, background 0.15s;
 }
 
-.vditor-pdf-export-select:hover {
+.vditor-pdf-export-select:hover,
 .vditor-pdf-export-select:focus {
     border-color: var(--list-hover-color);
 }
@@ -827,7 +827,7 @@ html[data-editor-theme]:not([data-editor-theme="Auto"]) {
     position: relative;
 }
 
-.vditor-pro-locked::before {
+.vditor-pro-locked::before,
 .vditor-pro-locked::after {
     display: none !important;
 }
@@ -902,15 +902,15 @@ html[data-editor-theme]:not([data-editor-theme="Auto"]) {
     line-height: 1.2;
 }
 
-.vditor-pro-locked:hover .vditor-pro-locked__badge {
-.vditor-pro-locked:focus .vditor-pro-locked__badge {
+.vditor-pro-locked:hover .vditor-pro-locked__badge,
+.vditor-pro-locked:focus .vditor-pro-locked__badge,
 .vditor-pro-locked:focus-visible .vditor-pro-locked__badge {
     opacity: 1;
     transform: translateY(0) scale(1);
 }
 
-.vditor-pro-locked:hover .vditor-pro-locked__tooltip {
-.vditor-pro-locked:focus .vditor-pro-locked__tooltip {
+.vditor-pro-locked:hover .vditor-pro-locked__tooltip,
+.vditor-pro-locked:focus .vditor-pro-locked__tooltip,
 .vditor-pro-locked:focus-visible .vditor-pro-locked__tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0) scale(1);
@@ -1229,7 +1229,7 @@ body.is-pro .office-markmap-lock {
     background: color-mix(in srgb, var(--read-accent) 14%, transparent);
     border-color: color-mix(in srgb, var(--read-accent) 30%, transparent);
 }
-.office-read-aloud button:focus-visible, .office-read-aloud select:focus-visible {
+.office-read-aloud button:focus-visible, .office-read-aloud select:focus-visible,
 .office-read-aloud input:focus-visible, .office-read-aloud textarea:focus-visible {
     outline: 2px solid var(--read-accent); outline-offset: 2px;
 }
@@ -1304,8 +1304,8 @@ body.is-pro .office-markmap-lock {
     background-color: rgba(59, 130, 246, .06);
     text-decoration: none;
 }
-html:is([data-editor-theme="One Dark"], [data-editor-theme="Github Dark"], [data-editor-theme="Nord"], [data-editor-theme="Monokai"], [data-editor-theme="Dracula"], [data-editor-theme="High Contrast Dark"]) #vditor ::highlight(office-read-aloud) {
-body.vscode-dark #vditor ::highlight(office-read-aloud) {
+html:is([data-editor-theme="One Dark"], [data-editor-theme="Github Dark"], [data-editor-theme="Nord"], [data-editor-theme="Monokai"], [data-editor-theme="Dracula"], [data-editor-theme="High Contrast Dark"]) #vditor ::highlight(office-read-aloud),
+body.vscode-dark #vditor ::highlight(office-read-aloud),
 body.vscode-high-contrast #vditor ::highlight(office-read-aloud) {
     background-color: rgba(96, 165, 250, .08);
 }
@@ -1321,8 +1321,8 @@ body.vscode-high-contrast #vditor ::highlight(office-read-aloud) {
 .office-read-aloud__volume .office-read-aloud__button:not(.is-active) { color: var(--read-fg); background: transparent; }
 
 /* Range controls keep their own track and focus treatment inside the VS Code webview. */
-#vditor .office-read-aloud input[type="range"] {
-#vditor .office-read-aloud input[type="range"]:focus {
+#vditor .office-read-aloud input[type="range"],
+#vditor .office-read-aloud input[type="range"]:focus,
 #vditor .office-read-aloud input[type="range"]:active {
     -webkit-appearance: none;
     appearance: none;
@@ -1351,7 +1351,7 @@ body.vscode-high-contrast #vditor ::highlight(office-read-aloud) {
     outline: none;
     transition: box-shadow .15s ease;
 }
-#vditor .office-read-aloud input[type="range"]:active::-webkit-slider-thumb {
+#vditor .office-read-aloud input[type="range"]:active::-webkit-slider-thumb,
 #vditor .office-read-aloud input[type="range"]:focus-visible::-webkit-slider-thumb {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--read-accent) 24%, transparent);
 }
@@ -1376,7 +1376,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 /* Pro locking hides generic tooltips; this toolbar entry keeps its action label. */
-.vditor-tooltipped.vditor-pro-locked[data-type="read-aloud"]:not(.vditor-tooltipped--clicked):is(:hover, :focus-visible)::before {
+.vditor-tooltipped.vditor-pro-locked[data-type="read-aloud"]:not(.vditor-tooltipped--clicked):is(:hover, :focus-visible)::before,
 .vditor-tooltipped.vditor-pro-locked[data-type="read-aloud"]:not(.vditor-tooltipped--clicked):is(:hover, :focus-visible)::after {
     display: inline-block !important;
 }
@@ -1419,7 +1419,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     font-size: 12px;
     line-height: 1.4;
 }
-.office-read-aloud__gender-field > span {
+.office-read-aloud__gender-field > span,
 .office-read-aloud__voice-field { white-space: nowrap; }
 .office-read-aloud__gender {
     display: inline-flex;
@@ -1825,8 +1825,8 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     outline: none;
 }
 
-.omni-inline-reply-input:focus {
-.omni-inline-textarea:focus {
+.omni-inline-reply-input:focus,
+.omni-inline-textarea:focus,
 .omni-inline-anchor-input:focus {
     border-color: var(--vscode-focusBorder, #3794ff);
 }

@@ -57,7 +57,8 @@ function syncMarkdownEditorIntegration(extPath: string): void {
       'index.js',
       'util.js',
       'imagePath.js',
-      'index.css'
+      'index.css',
+      'index.html'
     ]) {
       const s = path.join(srcDir, file);
       const d = path.join(dstDir, file);

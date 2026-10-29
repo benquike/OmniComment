@@ -643,14 +643,78 @@ export function initOmniAnnotations(getMarkdownValue) {
   selectionChip.className = 'omni-selection-chip';
   selectionChip.hidden = true;
   selectionChip.innerHTML = '💬 Comment';
-  selectionChip.addEventListener('mousedown', e => {
+  const onChipTrigger = e => {
     e.preventDefault();
     e.stopPropagation();
     const info = getEditorSelectionInfo();
     openAddCommentComposer(info.text, info.blockEl);
     selectionChip.hidden = true;
-  });
+  };
+  selectionChip.addEventListener('mousedown', onChipTrigger);
+  selectionChip.addEventListener('click', onChipTrigger);
   document.body.appendChild(selectionChip);
+
+  function ensureToolbarCommentButton() {
+    const toolbar = document.querySelector('.vditor-toolbar');
+    if (!toolbar) return;
+    if (toolbar.querySelector('[data-type="add-comment"]')) return;
+    const saveBtn = toolbar.querySelector('[data-type="save"]')?.closest('.vditor-toolbar__item');
+    const item = document.createElement('div');
+    item.className = 'vditor-toolbar__item right';
+    const btn = document.createElement('button');
+    btn.setAttribute('data-type', 'add-comment');
+    btn.className = 'vditor-tooltipped vditor-tooltipped__s';
+    btn.setAttribute('aria-label', 'Add Comment');
+    btn.innerHTML = '<span class="codicon codicon-comment" aria-hidden="true"></span>';
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openAddCommentComposer();
+    });
+    item.appendChild(btn);
+    if (saveBtn && saveBtn.nextSibling) {
+      saveBtn.parentNode.insertBefore(item, saveBtn.nextSibling);
+    } else {
+      toolbar.appendChild(item);
+    }
+  }
+
+  function ensureContextMenuCommentItem() {
+    const menu = document.getElementById('context-menu');
+    if (!menu) return;
+    if (menu.querySelector('[data-action="addComment"]')) return;
+    const group = document.createElement('div');
+    group.className = 'vditor-context-menu__group';
+    group.setAttribute('role', 'group');
+    group.innerHTML = `
+      <button class="vditor-context-menu__item" type="button" data-action="addComment" role="menuitem">
+        <span class="vditor-context-menu__icon" aria-hidden="true">
+          <span class="codicon codicon-comment"></span>
+        </span>
+        <span class="vditor-context-menu__label">Add Comment</span>
+        <span class="vditor-context-menu__shortcut" aria-hidden="true"></span>
+      </button>
+    `;
+    const sep = document.createElement('div');
+    sep.className = 'vditor-context-menu__separator';
+    sep.setAttribute('role', 'separator');
+
+    const copyBtn = menu.querySelector('[data-action="copy"]')?.closest('.vditor-context-menu__group');
+    if (copyBtn) {
+      menu.insertBefore(sep, copyBtn);
+      menu.insertBefore(group, copyBtn);
+    } else {
+      menu.appendChild(sep);
+      menu.appendChild(group);
+    }
+  }
+
+  ensureToolbarCommentButton();
+  ensureContextMenuCommentItem();
+  setTimeout(() => {
+    ensureToolbarCommentButton();
+    ensureContextMenuCommentItem();
+  }, 100);
 
   // Active zone descriptors: Array of { zoneId, blockEl, zoneEl, anchorRange }
   let activeZones = [];
@@ -1593,7 +1657,13 @@ export function initOmniAnnotations(getMarkdownValue) {
       return;
     }
     const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
+    let rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) {
+      const clientRects = range.getClientRects();
+      if (clientRects && clientRects.length > 0) {
+        rect = clientRects[0];
+      }
+    }
     if (!rect || (rect.width === 0 && rect.height === 0)) {
       selectionChip.hidden = true;
       return;
@@ -1613,6 +1683,11 @@ export function initOmniAnnotations(getMarkdownValue) {
   });
   document.addEventListener('keyup', () => {
     setTimeout(updateSelectionChip, 30);
+  });
+  let selectionChangeTimer = null;
+  document.addEventListener('selectionchange', () => {
+    if (selectionChangeTimer) clearTimeout(selectionChangeTimer);
+    selectionChangeTimer = setTimeout(updateSelectionChip, 40);
   });
 
   document.addEventListener('scroll', syncZonePositions, true);

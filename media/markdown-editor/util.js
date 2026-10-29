@@ -362,6 +362,32 @@ const emitExport = (editor, payload) => {
 
 export const createContextMenu = (editor, lang = 'en_US', workspaceBaseUrl = '') => {
     const menu = document.getElementById('context-menu')
+    if (!menu) return
+    if (!menu.querySelector('[data-action="addComment"]')) {
+        const group = document.createElement('div')
+        group.className = 'vditor-context-menu__group'
+        group.setAttribute('role', 'group')
+        group.innerHTML = `
+          <button class="vditor-context-menu__item" type="button" data-action="addComment" role="menuitem">
+            <span class="vditor-context-menu__icon" aria-hidden="true">
+              <span class="codicon codicon-comment"></span>
+            </span>
+            <span class="vditor-context-menu__label">Add Comment</span>
+            <span class="vditor-context-menu__shortcut" aria-hidden="true"></span>
+          </button>
+        `
+        const sep = document.createElement('div')
+        sep.className = 'vditor-context-menu__separator'
+        sep.setAttribute('role', 'separator')
+        const copyBtn = menu.querySelector('[data-action="copy"]')?.closest('.vditor-context-menu__group')
+        if (copyBtn) {
+            menu.insertBefore(sep, copyBtn)
+            menu.insertBefore(group, copyBtn)
+        } else {
+            menu.appendChild(sep)
+            menu.appendChild(group)
+        }
+    }
     const selectionTargets = { addToCodex: 'codex', addToClaudeCode: 'claude', addToCopilotChat: 'copilot' }
     let sourceSelection = null
     let lastContextText = ''
@@ -393,7 +419,8 @@ export const createContextMenu = (editor, lang = 'en_US', workspaceBaseUrl = '')
             sourceSelection.blocks = sourceSelection.blocks.map(block => restoreWorkspaceBaseUrls(block, workspaceBaseUrl))
         }
         for (const action of Object.keys(selectionTargets)) {
-            menu.querySelector(`[data-action="${action}"]`).disabled = !sourceSelection
+            const el = menu.querySelector(`[data-action="${action}"]`)
+            if (el) el.disabled = !sourceSelection
         }
         showContextMenu(menu, e.clientX, e.clientY)
     }
