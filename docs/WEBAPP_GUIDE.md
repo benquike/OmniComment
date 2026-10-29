@@ -10,10 +10,11 @@ Comprehensive guide on embedding, customizing, and scaling **OmniComment** in mo
 3. [React & Next.js Integration](#3-react--nextjs-integration)
 4. [Vue 3 & Nuxt Integration](#4-vue-3--nuxt-integration)
 5. [Svelte 5 & SvelteKit Integration](#5-svelte-5--sveltekit-integration)
-6. [Real-Time Collaboration & Storage Backends](#6-real-time-collaboration--storage-backends)
-   - [Local-First (IndexedDB / LocalStorage)](#local-first-storage)
-   - [Supabase & PostgreSQL (Realtime Subscriptions)](#supabase--postgresql-realtime)
-   - [WebSocket Broadcast Server (Node.js / Go)](#websocket-broadcast-server)
+6. [Comment Persistence Approaches (With Full Code Samples)](#6-comment-persistence-approaches)
+   - [Approach 1: REST API Storage (Client SDK & Next.js / Express Server)](#approach-1-rest-api-storage)
+   - [Approach 2: Local-First Offline Storage (IndexedDB & LocalStorage)](#approach-2-local-first-offline-storage)
+   - [Approach 3: Real-Time Collaborative Storage (Supabase & WebSockets)](#approach-3-real-time-collaborative-storage)
+   - [Approach 4: Git-Compatible In-File Markdown Storage (CMS & Web Editors)](#approach-4-git-compatible-in-file-markdown-storage)
 7. [Authentication & Multi-Tenant User Roles](#7-authentication--multi-tenant-user-roles)
 8. [Theming & CSS Custom Properties](#8-theming--css-custom-properties)
 9. [Web SDK Programmatic API Reference](#9-web-sdk-programmatic-api-reference)
@@ -272,92 +273,385 @@ onBeforeUnmount(() => {
 
 ---
 
-## 6. Real-Time Collaboration & Storage Backends
+## 6. Comment Persistence Approaches (With Full Code Samples)
 
-OmniComment provides flexible storage adapters to support everything from offline-only personal wikis to large-scale enterprise team collaboration.
+OmniComment provides flexible storage adapters to support everything from offline-only personal wikis to large-scale enterprise team collaboration. Below are production-ready code samples for each of the four persistence approaches:
 
-### Local-First Storage
-Ideal for offline PWAs, local tools, and blogs without backend authentication:
+---
+
+### Approach 1: REST API Storage (Client SDK & Next.js / Express Server)
+
+Best suited for multi-user SaaS applications, internal documentation portals, and content management systems.
+
+#### 1. Client-Side SDK Setup
 ```typescript
 import { initOmniComment } from '@omnicomment/web-plugin';
 
-initOmniComment({
-  target: '#article',
+const omni = initOmniComment({
+  target: '#article-content',
+  documentId: 'doc-guides-architecture',
+  author: 'Sarah Connor',
+  preset: 'team-collaboration',
   storage: {
-    type: 'indexeddb',
-    dbName: 'my_app_annotations',
-    storeName: 'comments'
-  }
+    type: 'rest',
+    endpoint: '/api/documents/doc-guides-architecture/comments',
+    headers: {
+      'Authorization': 'Bearer ' + userSessionToken,
+      'Content-Type': 'application/json'
+    }
+  },
+  onCommentAdded: (comment) => console.log('Comment created:', comment.id),
+  onCommentResolved: (id) => console.log('Thread resolved:', id)
 });
 ```
 
-### Supabase & PostgreSQL (Realtime Subscriptions)
-Synchronize comments between multiple web users and VS Code automatically using Supabase Realtime:
+#### 2. Next.js App Router Route Handler (`app/api/documents/[docId]/comments/route.ts`)
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
 
+// In production, connect to Prisma / PostgreSQL / MongoDB
+const db = new Map<string, any[]>();
+
+// GET: Retrieve all comments for the specified document
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { docId: string } }
+) {
+  const docComments = db.get(params.docId) || [];
+  return NextResponse.json({ comments: docComments });
+}
+
+// POST: Add a new comment thread
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { docId: string } }
+) {
+  const newComment = await request.json();
+  const docComments = db.get(params.docId) || [];
+  docComments.push(newComment);
+  db.set(params.docId, docComments);
+  return NextResponse.json({ success: true, comment: newComment }, { status: 201 });
+}
+
+// PATCH: Add reply, toggle resolved state, or edit content
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { docId: string } }
+) {
+  const { commentId, patch } = await request.json();
+  const docComments = db.get(params.docId) || [];
+  const target = docComments.find((c: any) => c.id === commentId);
+
+  if (!target) {
+    return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+  }
+
+  // Handle replies or top-level updates
+  if (patch.reply) {
+    target.replies = target.replies || [];
+    target.replies.push(patch.reply);
+  } else {
+    Object.assign(target, patch);
+  }
+  target.updatedAt = new Date().toISOString();
+
+  return NextResponse.json({ success: true, comment: target });
+}
+
+// DELETE: Delete a comment thread by ID
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { docId: string } }
+) {
+  const { searchParams } = new URL(request.url);
+  const commentId = searchParams.get('id');
+  let docComments = db.get(params.docId) || [];
+  docComments = docComments.filter((c: any) => c.id !== commentId);
+  db.set(params.docId, docComments);
+  return NextResponse.json({ success: true });
+}
+```
+
+---
+
+### Approach 2: Local-First Offline Storage (IndexedDB & LocalStorage)
+
+Ideal for static site generators (Docusaurus, VitePress, Hugo), personal notes, and offline PWAs.
+
+#### 1. Zero-Build Web Component Setup
+```html
+<!-- IndexedDB local persistence -->
+<omni-comment
+  target="#content-area"
+  document-id="/docs/getting-started"
+  storage="indexeddb"
+  preset="documentation-site"
+></omni-comment>
+<script type="module" src="https://unpkg.com/@omnicomment/web-plugin/dist/index.js"></script>
+```
+
+#### 2. Advanced Client Setup with Export & Backup Utilities
+```typescript
+import { initOmniComment, OmniCommentInstance } from '@omnicomment/web-plugin';
+
+// Initialize with IndexedDB adapter
+const omni: OmniCommentInstance = initOmniComment({
+  target: '#article-content',
+  documentId: window.location.pathname,
+  preset: 'documentation-site',
+  storage: {
+    type: 'indexeddb',
+    dbName: 'omnicomment_offline_db',
+    storeName: 'annotations'
+  }
+});
+
+// Utility: Export all local comments as JSON for user backup
+export async function exportLocalAnnotations(docId: string): Promise<string> {
+  const allComments = omni.getComments();
+  return JSON.stringify({ documentId: docId, exportedAt: new Date().toISOString(), comments: allComments }, null, 2);
+}
+
+// Utility: Clear all local comments for this page
+export async function clearLocalAnnotations(): Promise<void> {
+  const allComments = omni.getComments();
+  for (const c of allComments) {
+    omni.deleteComment(c.id);
+  }
+}
+```
+
+---
+
+### Approach 3: Real-Time Collaborative Storage (Supabase & WebSockets)
+
+Synchronizes comments, replies, and resolved states instantaneously across browser tabs, multiple remote users, and connected VS Code workspaces.
+
+#### 3A. Supabase Realtime & PostgreSQL
+
+##### PostgreSQL Table DDL:
+```sql
+CREATE TABLE public.omni_comments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  document_id TEXT NOT NULL,
+  data JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Index by document ID for sub-millisecond retrieval
+CREATE INDEX idx_omni_comments_doc ON public.omni_comments(document_id);
+
+-- Enable Supabase Realtime replication on this table
+ALTER PUBLICATION supabase_realtime ADD TABLE public.omni_comments;
+```
+
+##### Client Implementation:
 ```typescript
 import { createClient } from '@supabase/supabase-js';
 import { initOmniComment } from '@omnicomment/web-plugin';
 
-const supabase = createClient('https://xyzcompany.supabase.co', 'public-anon-key');
+const supabase = createClient('https://your-project.supabase.co', 'your-anon-key');
+
+const docId = 'rfcs/proposal-42';
 
 const omni = initOmniComment({
-  target: '#article',
-  documentId: 'rfc-102',
+  target: '#rfc-body',
+  documentId: docId,
+  author: 'Jane Doe',
   storage: {
     type: 'custom',
     async loadComments(docId) {
       const { data } = await supabase
-        .from('comments')
-        .select('*')
+        .from('omni_comments')
+        .select('data')
         .eq('document_id', docId);
-      return data || [];
+      return data?.map(row => row.data) || [];
     },
     async saveComment(docId, comment) {
-      await supabase.from('comments').upsert({
+      await supabase.from('omni_comments').upsert({
         id: comment.id,
         document_id: docId,
-        data: comment
+        data: comment,
+        updated_at: new Date().toISOString()
       });
     },
     async deleteComment(docId, commentId) {
-      await supabase.from('comments').delete().eq('id', commentId);
+      await supabase.from('omni_comments').delete().eq('id', commentId);
     }
   }
 });
 
-// Subscribe to live changes broadcast by team members
+// Subscribe to real-time broadcasts from other team members
 supabase
-  .channel('public:comments')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, (payload) => {
-    if (payload.new) {
+  .channel(`comments:${docId}`)
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'omni_comments', filter: `document_id=eq.${docId}` }, (payload) => {
+    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
       omni.syncRemoteUpdate(payload.new.data);
+    } else if (payload.eventType === 'DELETE') {
+      omni.removeRemoteComment(payload.old.id);
     }
   })
   .subscribe();
 ```
 
-### WebSocket Broadcast Server
-Connect browser users and VS Code instances on the same local network or team server:
+#### 3B. Standalone WebSocket Broadcast Server (Node.js)
 
+##### WebSocket Server (`server.js`):
+```javascript
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
+
+// Room-based broadcasting: room -> Set of WebSocket clients
+const rooms = new Map();
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'http://localhost:8080');
+  const room = url.searchParams.get('room') || 'default';
+
+  if (!rooms.has(room)) rooms.set(room, new Set());
+  const clients = rooms.get(room);
+  clients.add(ws);
+
+  ws.on('message', (message) => {
+    // Broadcast received comment event to all other clients in the same room
+    for (const client of clients) {
+      if (client !== ws && client.readyState === WebSocket.OPEN) {
+        client.send(message);
+      }
+    }
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    if (clients.size === 0) rooms.delete(room);
+  });
+});
+
+console.log('OmniComment WebSocket sync server listening on ws://localhost:8080');
+```
+
+##### Client Implementation:
 ```typescript
-const socket = new WebSocket('wss://comments.internal.net/ws?room=doc-42');
+import { initOmniComment } from '@omnicomment/web-plugin';
+
+const docId = 'spec-markdown-editor';
+const socket = new WebSocket(`ws://localhost:8080?room=${encodeURIComponent(docId)}`);
 
 const omni = initOmniComment({
-  target: '#content',
+  target: '#article-container',
+  documentId: docId,
+  author: 'Hui Peng',
   storage: {
     type: 'custom',
     saveComment: (docId, comment) => {
-      socket.send(JSON.stringify({ type: 'ADD_COMMENT', comment }));
+      socket.send(JSON.stringify({ type: 'UPSERT_COMMENT', comment }));
+    },
+    deleteComment: (docId, commentId) => {
+      socket.send(JSON.stringify({ type: 'DELETE_COMMENT', commentId }));
     }
   }
 });
 
 socket.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  if (msg.type === 'SYNC') {
-    omni.syncAllComments(msg.comments);
+  if (msg.type === 'UPSERT_COMMENT') {
+    omni.syncRemoteUpdate(msg.comment);
+  } else if (msg.type === 'DELETE_COMMENT') {
+    omni.removeRemoteComment(msg.commentId);
   }
 };
+```
+
+---
+
+### Approach 4: Git-Compatible In-File Markdown Storage (CMS & Web Editors)
+
+When building in-browser Markdown editors (using Monaco, CodeMirror, or Vditor) or publishing to GitHub via API, comments can be serialized directly into Markdown documents using the same `<!-- omnicomment` block structure as the VS Code extension.
+
+#### Web Markdown Editor Integration Sample:
+```typescript
+import { MarkdownStorageAdapter } from '@omnicomment/core';
+import { initOmniComment, OmniCommentInstance } from '@omnicomment/web-plugin';
+
+export class MarkdownDocManager {
+  private adapter = new MarkdownStorageAdapter();
+  private omni: OmniCommentInstance | null = null;
+  private currentMarkdown: string = '';
+
+  constructor(private containerSelector: string) {}
+
+  /**
+   * Loads a raw Markdown document, extracts embedded comments, and attaches OmniComment UI
+   */
+  public loadDocument(rawMarkdown: string, docId: string): void {
+    this.currentMarkdown = rawMarkdown;
+
+    // 1. Extract existing comments from <!-- omnicomment block
+    const existingComments = this.adapter.parseCommentsFromText(rawMarkdown);
+
+    // 2. Initialize OmniComment with extracted comments
+    this.omni = initOmniComment({
+      target: this.containerSelector,
+      documentId: docId,
+      initialComments: existingComments,
+      storage: {
+        type: 'custom',
+        saveComment: () => {
+          this.syncMarkdownBuffer();
+        },
+        deleteComment: () => {
+          this.syncMarkdownBuffer();
+        }
+      }
+    });
+  }
+
+  /**
+   * Re-serializes active comments into the Markdown buffer
+   */
+  private syncMarkdownBuffer(): void {
+    if (!this.omni) return;
+    const activeComments = this.omni.getComments();
+    this.currentMarkdown = this.adapter.formatUpdatedText(this.currentMarkdown, activeComments);
+  }
+
+  /**
+   * Returns complete Markdown text with updated <!-- omnicomment block ready to commit to Git
+   */
+  public getGitReadyMarkdown(): string {
+    this.syncMarkdownBuffer();
+    return this.currentMarkdown;
+  }
+
+  /**
+   * Pushes updated Markdown directly to GitHub repository via GitHub REST API
+   */
+  public async pushToGitHub(repo: string, filePath: string, token: string, commitMsg: string): Promise<void> {
+    const updatedContent = this.getGitReadyMarkdown();
+    const base64Content = btoa(unescape(encodeURIComponent(updatedContent)));
+
+    // 1. Get existing file SHA
+    const fileRes = await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+      headers: { Authorization: `token ${token}` }
+    });
+    const fileData = await fileRes.json();
+
+    // 2. Commit update
+    await fetch(`https://api.github.com/repos/${repo}/contents/${filePath}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: commitMsg,
+        content: base64Content,
+        sha: fileData.sha
+      })
+    });
+  }
+}
 ```
 
 ---
