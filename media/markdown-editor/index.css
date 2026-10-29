@@ -1593,23 +1593,23 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     pointer-events: auto;
     box-sizing: border-box;
     font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: 11.5px;
+    line-height: 1.3;
     color: var(--front-color, var(--vscode-editorWidget-foreground, #e3e3e3));
     width: fit-content !important;
-    max-width: 340px !important;
-    min-width: 160px !important;
+    max-width: 320px !important;
+    min-width: 130px !important;
 }
 
 .omni-inline-zone__arrow {
     position: absolute;
-    top: -5px;
-    left: 20px;
-    width: 8px;
-    height: 8px;
+    top: -4px;
+    left: 18px;
+    width: 6px;
+    height: 6px;
     background: var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328));
-    border-left: 1px solid var(--border-color, rgba(128, 128, 128, 0.4));
-    border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.4));
+    border-left: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+    border-top: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
     transform: rotate(45deg);
     z-index: 2;
 }
@@ -1617,16 +1617,16 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 .omni-inline-zone__stack {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .omni-inline-thread {
     position: relative;
     z-index: 1;
-    border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
-    border-radius: 6px;
+    border: 1px solid var(--border-color, rgba(128, 128, 128, 0.28));
+    border-radius: 5px;
     background: var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328));
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16);
     overflow: hidden;
 }
 
@@ -1638,12 +1638,12 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
-    padding: 2px 6px;
-    min-height: 22px;
+    gap: 3px;
+    padding: 1px 6px;
+    min-height: 20px;
     box-sizing: border-box;
-    background: color-mix(in srgb, var(--front-color, #ffffff) 6%, var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328)));
-    border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.22));
+    background: color-mix(in srgb, var(--front-color, #ffffff) 4%, var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328)));
+    border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.18));
     user-select: none;
 }
 
@@ -1658,7 +1658,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 .omni-inline-thread__header-left {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     min-width: 0;
     flex: 1;
     cursor: pointer;
@@ -1667,32 +1667,33 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 
 .omni-inline-author {
     font-weight: 600;
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--front-color, #e6edf3);
     white-space: nowrap;
 }
 
 .omni-inline-sep {
-    opacity: 0.45;
-    font-size: 10px;
+    opacity: 0.4;
+    font-size: 9px;
+    margin: 0 1px;
 }
 
 .omni-inline-time {
-    font-size: 10.5px;
-    opacity: 0.6;
+    font-size: 10px;
+    opacity: 0.55;
     white-space: nowrap;
 }
 
 .omni-inline-status-badge {
-    font-size: 10px;
-    padding: 1px 4px;
-    border-radius: 3px;
+    font-size: 9.5px;
+    padding: 0 3px;
+    border-radius: 2px;
     font-weight: 600;
     white-space: nowrap;
 }
 
 .omni-inline-status-badge.is-resolved {
-    background: rgba(73, 179, 96, 0.2);
+    background: rgba(73, 179, 96, 0.18);
     color: #49b360;
 }
 
@@ -1759,14 +1760,14 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     border: none;
     background: transparent;
     color: inherit;
-    opacity: 0.75;
-    width: 18px;
-    height: 18px;
+    opacity: 0.7;
+    width: 16px;
+    height: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 3px;
-    font-size: 11px;
+    font-size: 10px;
     cursor: pointer;
     padding: 0;
 }
@@ -1782,8 +1783,8 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-thread:hover .omni-hover-action {
-    opacity: 0.75 !important;
-    width: 18px !important;
+    opacity: 0.7 !important;
+    width: 16px !important;
     pointer-events: auto !important;
     padding: 0 !important;
 }
@@ -1793,14 +1794,14 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-header-btn .codicon {
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
     display: inline-block;
 }
 
 .omni-inline-header-btn:hover {
     opacity: 1;
-    background: rgba(127, 127, 127, 0.2);
+    background: rgba(127, 127, 127, 0.18);
 }
 
 .omni-inline-header-btn.is-danger:hover {
@@ -1808,29 +1809,29 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-item-btn .codicon {
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1;
     display: inline-block;
 }
 
 .omni-inline-thread__body {
-    padding: 3px 8px 4px;
+    padding: 2px 6px 3px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
 }
 
 .omni-inline-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
 }
 
 .omni-inline-item__meta {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 4px;
+    font-size: 10.5px;
 }
 
 .omni-inline-item__author {
@@ -1839,8 +1840,8 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-item__time {
-    font-size: 11px;
-    opacity: 0.6;
+    font-size: 10px;
+    opacity: 0.55;
 }
 
 .omni-inline-item__actions {
@@ -1860,9 +1861,9 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     border: none;
     background: transparent;
     color: inherit;
-    font-size: 11px;
-    padding: 1px 5px;
-    border-radius: 3px;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 2px;
     cursor: pointer;
     opacity: 0.8;
 }
@@ -1877,8 +1878,8 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-item__text {
-    font-size: 12.5px;
-    line-height: 1.45;
+    font-size: 11.5px;
+    line-height: 1.32;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;

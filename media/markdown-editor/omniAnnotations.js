@@ -975,7 +975,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       cssRules.push(
-        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 4}px !important; }`
+        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 2}px !important; }`
       );
     }
 
@@ -999,8 +999,8 @@ export function initOmniAnnotations(getMarkdownValue) {
       zoneEl.style.top = `${top}px`;
       zoneEl.style.left = `${left}px`;
       zoneEl.style.width = 'fit-content';
-      zoneEl.style.maxWidth = '340px';
-      zoneEl.style.minWidth = '160px';
+      zoneEl.style.maxWidth = '320px';
+      zoneEl.style.minWidth = '130px';
 
       const arrowEl = zoneEl.querySelector('.omni-inline-zone__arrow');
       if (arrowEl) {
