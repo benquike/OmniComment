@@ -662,10 +662,17 @@ export function activate(context: vscode.ExtensionContext) {
     commentStatusBarItem.show();
   };
 
-  updateStatusBar(vscode.window.activeTextEditor);
+  const handleEditorSelectionOrActiveChange = (editor?: vscode.TextEditor): void => {
+    updateStatusBar(editor);
+    commentDecorator.updateSelectionDecoration(editor);
+  };
+
+  handleEditorSelectionOrActiveChange(vscode.window.activeTextEditor);
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(updateStatusBar),
-    vscode.window.onDidChangeTextEditorSelection(e => updateStatusBar(e.textEditor))
+    vscode.window.onDidChangeActiveTextEditor(handleEditorSelectionOrActiveChange),
+    vscode.window.onDidChangeTextEditorSelection(e =>
+      handleEditorSelectionOrActiveChange(e.textEditor)
+    )
   );
 
   // Register commands
@@ -1577,6 +1584,13 @@ export function getCommentServiceForTesting(): CommentService {
 
 export function getInlineCommentControllerForTesting(): InlineCommentController {
   return inlineCommentController;
+}
+
+// Invariant: Exposes the active CommentDecorator instance for test verification.
+// Why: Enables automated testing of gutter icons and text selection decorations.
+// Example: getCommentDecoratorForTesting().updateSelectionDecoration(editor);
+export function getCommentDecoratorForTesting(): CommentDecorator {
+  return commentDecorator;
 }
 
 export async function queryMarkdownEditorInlineStateForTesting(

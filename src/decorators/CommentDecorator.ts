@@ -7,6 +7,7 @@ import { Comment } from '../types';
 export class CommentDecorator {
   private decorationType: vscode.TextEditorDecorationType;
   private focusedDecorationType: vscode.TextEditorDecorationType;
+  private selectionGutterDecorationType: vscode.TextEditorDecorationType;
   private focusedCommentId: string | null = null;
   private gutterIconUri?: vscode.Uri;
 
@@ -16,6 +17,11 @@ export class CommentDecorator {
     }
     this.decorationType = this.createDecorationType(false);
     this.focusedDecorationType = this.createDecorationType(true);
+    this.selectionGutterDecorationType = vscode.window.createTextEditorDecorationType({
+      gutterIconPath: this.gutterIconUri,
+      gutterIconSize: 'contain',
+      cursor: 'pointer'
+    });
   }
 
   // Invariant: Configures editor decoration styles including yellow background and gutter comment icon.
@@ -173,11 +179,48 @@ export class CommentDecorator {
     }
   }
 
+  // Invariant: Displays the comment bubble gutter icon on the active selection line.
+  // Why: Gives an immediate visual indicator in the line number gutter when text is selected.
+  // Example: User highlights text on line 12 -> line 12 gutter shows comment bubble.
+  updateSelectionDecoration(editor?: vscode.TextEditor): void {
+    if (!editor) {
+      return;
+    }
+    if (editor.selection.isEmpty) {
+      editor.setDecorations(this.selectionGutterDecorationType, []);
+      return;
+    }
+
+    const selectedText = editor.document.getText(editor.selection).trim();
+    if (!selectedText) {
+      editor.setDecorations(this.selectionGutterDecorationType, []);
+      return;
+    }
+
+    const preview = selectedText.length > 30 ? `${selectedText.slice(0, 27)}...` : selectedText;
+    const hoverMd = new vscode.MarkdownString(
+      `💬 **OmniComment**: Add comment on "${preview}"\n\n[$(comment) Add Comment](command:omnicomment.addComment)`,
+      true
+    );
+    hoverMd.isTrusted = true;
+
+    const startLine = editor.selection.start.line;
+    const targetRange = new vscode.Range(startLine, 0, startLine, 0);
+
+    editor.setDecorations(this.selectionGutterDecorationType, [
+      {
+        range: targetRange,
+        hoverMessage: hoverMd
+      }
+    ]);
+  }
+
   /**
    * Dispose of decoration types
    */
   dispose(): void {
     this.decorationType.dispose();
     this.focusedDecorationType.dispose();
+    this.selectionGutterDecorationType.dispose();
   }
 }

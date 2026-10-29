@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as Mocha from 'mocha';
 import {
   getActiveMarkdownContext,
+  getCommentDecoratorForTesting,
   getCommentServiceForTesting,
   getInlineCommentControllerForTesting,
   resolveAnchorSelectionForThread
@@ -325,5 +326,36 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     const rawLog = document.getText();
     assert.ok(rawLog.includes('<!-- omnicomment'), 'Comment block must be stored in xxx.log');
     assert.ok(rawLog.includes('connection pool exhausted'), 'Anchor must be present');
+  });
+
+  // Topology: Text selection in .txt editor -> updateSelectionDecoration -> line gutter active
+  // Expected: Calling updateSelectionDecoration on .txt editor with active text selection sets gutter decorations properly.
+  test('Txt 6: Dynamic selection gutter icon updates on plain text selection', async () => {
+    const filePath = path.join(tempDir, 'selection-gutter.txt');
+    fs.writeFileSync(
+      filePath,
+      'Line 1: Header\nLine 2: Highlighted line for gutter bubble test\nLine 3: Footer\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    // Initial empty selection -> should clear decorations without error
+    editor.selection = new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
+    const decorator = getCommentDecoratorForTesting();
+    decorator.updateSelectionDecoration(editor);
+
+    // Non-empty selection on Line 2
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 15));
+    assert.doesNotThrow(() => {
+      decorator.updateSelectionDecoration(editor);
+    });
+
+    // Clear selection
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 0));
+    assert.doesNotThrow(() => {
+      decorator.updateSelectionDecoration(editor);
+    });
   });
 });

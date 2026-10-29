@@ -108,15 +108,15 @@ suite('Extension Test Suite', () => {
 
       assert.strictEqual(
         editorContextWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log'
       );
       assert.strictEqual(
         editorTitleWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
       assert.strictEqual(
         keybindingWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
     });
 

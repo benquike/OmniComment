@@ -173,6 +173,55 @@ suite('CommentDecorator Test Suite', () => {
     });
   });
 
+  suite('updateSelectionDecoration', () => {
+    // Topology: mockEditor with empty selection -> updateSelectionDecoration -> setDecorations([])
+    // Expected: Decorator clears selection gutter decoration when selection is empty.
+    test('should clear selection decorations when editor has empty selection', () => {
+      let passedDecorations: vscode.DecorationOptions[] | undefined;
+      const mockEditor = {
+        document: {
+          getText: () => ''
+        },
+        selection: new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 0)),
+        setDecorations: (_type: unknown, rangesOrOptions: vscode.DecorationOptions[]) => {
+          passedDecorations = rangesOrOptions;
+        }
+      } as unknown as vscode.TextEditor;
+
+      commentDecorator.updateSelectionDecoration(mockEditor);
+
+      assert.deepStrictEqual(passedDecorations, []);
+    });
+
+    // Topology: mockEditor with selected text -> updateSelectionDecoration -> setDecorations(targetRange)
+    // Expected: Gutter decoration is placed on the selection start line with hover message.
+    test('should apply selection gutter decoration on selection line when text is selected', () => {
+      let passedDecorations: vscode.DecorationOptions[] | undefined;
+      const mockEditor = {
+        document: {
+          getText: () => 'target text'
+        },
+        selection: new vscode.Selection(new vscode.Position(1, 7), new vscode.Position(1, 18)),
+        setDecorations: (_type: unknown, rangesOrOptions: vscode.DecorationOptions[]) => {
+          passedDecorations = rangesOrOptions;
+        }
+      } as unknown as vscode.TextEditor;
+
+      commentDecorator.updateSelectionDecoration(mockEditor);
+
+      assert.ok(passedDecorations && passedDecorations.length === 1);
+      assert.strictEqual(passedDecorations[0].range.start.line, 1);
+    });
+
+    // Topology: undefined editor -> updateSelectionDecoration -> no-op
+    // Expected: Handles undefined editor gracefully without throwing.
+    test('should handle undefined editor gracefully without throwing', () => {
+      assert.doesNotThrow(() => {
+        commentDecorator.updateSelectionDecoration(undefined);
+      });
+    });
+  });
+
   suite('dispose', () => {
     test('should dispose decoration types', () => {
       // Create a new decorator to test disposal
