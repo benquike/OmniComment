@@ -94,6 +94,15 @@ const PAGES = [
     description: 'Integrate in React, Next.js, Vue 3, Nuxt, Svelte 5, SvelteKit, WebSockets, and Supabase.'
   },
   {
+    id: 'firebase-server-guide',
+    title: 'Firebase Persistence Server',
+    shortTitle: 'Firebase Server Guide',
+    category: 'Backend & Cloud',
+    source: 'docs/FIREBASE_SERVER_GUIDE.md',
+    dest: 'firebase-server-guide.html',
+    description: 'Serverless backend with Firebase Cloud Functions v2 and Firestore real-time sync.'
+  },
+  {
     id: 'chrome-extension-guide',
     title: 'Chrome Extension Guide',
     shortTitle: 'Chrome Extension Guide',

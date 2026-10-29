@@ -15,6 +15,7 @@ Comprehensive guide on embedding, customizing, and scaling **OmniComment** in mo
    - [Approach 2: Local-First Offline Storage (IndexedDB & LocalStorage)](#approach-2-local-first-offline-storage)
    - [Approach 3: Real-Time Collaborative Storage (Supabase & WebSockets)](#approach-3-real-time-collaborative-storage)
    - [Approach 4: Git-Compatible In-File Markdown Storage (CMS & Web Editors)](#approach-4-git-compatible-in-file-markdown-storage)
+   - [Approach 5: Firebase Cloud Storage & Real-Time Sync (Firestore & Cloud Functions)](#approach-5-firebase-cloud-storage--real-time-sync)
 7. [Authentication & Multi-Tenant User Roles](#7-authentication--multi-tenant-user-roles)
 8. [Theming & CSS Custom Properties](#8-theming--css-custom-properties)
 9. [Web SDK Programmatic API Reference](#9-web-sdk-programmatic-api-reference)
@@ -653,6 +654,47 @@ export class MarkdownDocManager {
   }
 }
 ```
+
+---
+
+### Approach 5: Firebase Cloud Storage & Real-Time Sync (Firestore & Cloud Functions)
+
+For high-concurrency cloud persistence with sub-100ms latency, seamless offline capabilities, and zero-maintenance infrastructure, OmniComment provides an official Firebase server backend (`servers/firebase/`) using **Firebase Cloud Functions (v2)** and **Google Cloud Firestore**.
+
+#### 1. Real-Time Client Integration (`firebase/firestore`)
+```typescript
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { initOmniComment } from '@omnicomment/web-plugin';
+
+const app = initializeApp({
+  apiKey: "AIzaSy...",
+  projectId: "my-docs-app"
+});
+const db = getFirestore(app);
+
+const omni = initOmniComment({
+  target: '#article-container',
+  documentId: 'api-reference-v2',
+  author: 'Ada Lovelace',
+  storage: {
+    type: 'custom',
+    subscribe: (docId, onUpdate) => {
+      const q = query(collection(db, 'documents', docId, 'comments'), orderBy('createdAt', 'asc'));
+      return onSnapshot(q, (snapshot) => onUpdate(snapshot.docs.map(d => d.data())));
+    },
+    saveComment: async (docId, comment) => {
+      await setDoc(doc(db, 'documents', docId, 'comments', comment.id), comment, { merge: true });
+    },
+    deleteComment: async (docId, commentId) => {
+      await deleteDoc(doc(db, 'documents', docId, 'comments', commentId));
+    }
+  }
+});
+```
+
+> [!TIP]
+> For the complete backend implementation, local emulator configuration, security rules, and production deployment instructions, see the dedicated [Firebase Server Guide](docs/FIREBASE_SERVER_GUIDE.md).
 
 ---
 

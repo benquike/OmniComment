@@ -23,6 +23,13 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Server builds & dependencies
+servers/**/dist/
+servers/**/node_modules/
 
 # Test data
 .vscode-test/

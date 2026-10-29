@@ -25,6 +25,7 @@ suite('DocRenderer Test Suite', () => {
     assert.ok(ids.includes('api-reference'));
     assert.ok(ids.includes('agent-api'));
     assert.ok(ids.includes('integration'));
+    assert.ok(ids.includes('firebase-server-guide'));
     assert.ok(ids.includes('presets'));
     assert.ok(ids.includes('architecture'));
     assert.ok(ids.includes('readme'));
@@ -94,6 +95,7 @@ Check out the [Tutorial](docs/TUTORIAL.md) and [API](file:///usr/local/path/docs
       assert.ok(fs.existsSync(path.join(tempDir, 'api-reference.html')));
       assert.ok(fs.existsSync(path.join(tempDir, 'agent-api.html')));
       assert.ok(fs.existsSync(path.join(tempDir, 'integration.html')));
+      assert.ok(fs.existsSync(path.join(tempDir, 'firebase-server-guide.html')));
       assert.ok(fs.existsSync(path.join(tempDir, 'presets.html')));
       assert.ok(fs.existsSync(path.join(tempDir, 'architecture.html')));
 

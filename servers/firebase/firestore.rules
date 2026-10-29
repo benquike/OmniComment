@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for validation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAuthor(commentData) {
+      return isAuthenticated() && (
+        (commentData.authorId != null && request.auth.uid == commentData.authorId) ||
+        (commentData.author == request.auth.token.name || commentData.author == request.auth.token.email)
+      );
+    }
+
+    function isValidAnchor(anchor) {
+      return anchor is map
+        && anchor.keys().hasAll(['text', 'startLine', 'startChar', 'endLine', 'endChar'])
+        && anchor.text is string
+        && anchor.startLine is int
+        && anchor.startChar is int
+        && anchor.endLine is int
+        && anchor.endChar is int;
+    }
+
+    function isValidCommentCreate() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['id', 'content', 'author', 'createdAt', 'anchor'])
+        && data.id is string
+        && data.content is string
+        && data.content.size() > 0
+        && data.content.size() <= 10000
+        && data.author is string
+        && data.author.size() > 0
+        && data.createdAt is string
+        && isValidAnchor(data.anchor);
+    }
+
+    function isValidCommentUpdate() {
+      let incoming = request.resource.data;
+      let existing = resource.data;
+      // Invariant: Core immutable fields cannot be modified
+      return incoming.id == existing.id
+        && incoming.createdAt == existing.createdAt
+        && incoming.anchor == existing.anchor
+        && incoming.author == existing.author;
+    }
+
+    // Top-level document container
+    match /documents/{documentId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+
+      // Comments subcollection
+      match /comments/{commentId} {
+        // Anyone can read comments on public documentation
+        allow read: if true;
+
+        // Creating a comment: Validates required anchor, content, and author fields
+        allow create: if isValidCommentCreate();
+
+        // Updating a comment: Validates immutability of id/anchor/createdAt and author permissions
+        allow update: if isValidCommentUpdate();
+
+        // Deleting a comment: Permitted for the author or authenticated moderator
+        allow delete: if isAuthenticated() && (
+          isAuthor(resource.data) || 
+          request.auth.token.admin == true
+        );
+
+        // Subcollection replies (if stored as subcollection instead of embedded array)
+        match /replies/{replyId} {
+          allow read: if true;
+          allow create: if request.resource.data.content is string 
+                        && request.resource.data.author is string;
+          allow update, delete: if isAuthenticated();
+        }
+      }
+    }
+  }
+}
