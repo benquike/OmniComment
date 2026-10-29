@@ -722,9 +722,34 @@ export function initOmniAnnotations(getMarkdownValue) {
   function getContentRoot() {
     const root = document.getElementById('vditor');
     if (!root) return null;
+
+    // Check visible panels according to active mode (wysiwyg, ir, sv)
+    const panels = [
+      root.querySelector('.vditor-wysiwyg'),
+      root.querySelector('.vditor-ir'),
+      root.querySelector('.vditor-sv')
+    ].filter(Boolean);
+
+    for (const panel of panels) {
+      const isHidden =
+        panel.classList.contains('vditor-panel--none') ||
+        panel.style.display === 'none' ||
+        (panel.offsetWidth === 0 && panel.offsetHeight === 0 && panel.getClientRects().length === 0);
+      if (!isHidden) {
+        const resetEl = panel.querySelector('.vditor-reset');
+        if (resetEl) return resetEl;
+        return panel;
+      }
+    }
+
     return (
+      root.querySelector('.vditor-wysiwyg:not(.vditor-panel--none) .vditor-reset') ||
+      root.querySelector('.vditor-ir:not(.vditor-panel--none) .vditor-reset') ||
+      root.querySelector('.vditor-sv:not(.vditor-panel--none) .vditor-reset') ||
       root.querySelector('.vditor-wysiwyg .vditor-reset') ||
       root.querySelector('.vditor-ir .vditor-reset') ||
+      root.querySelector('.vditor-sv .vditor-reset') ||
+      root.querySelector('.vditor-reset') ||
       root
     );
   }
@@ -1699,6 +1724,43 @@ export function initOmniAnnotations(getMarkdownValue) {
       syncZonePositions();
     });
     ro.observe(rootEl);
+  }
+
+  if (rootEl && window.MutationObserver) {
+    let modeDebounceTimer = null;
+    const mo = new MutationObserver(mutations => {
+      let modeChanged = false;
+      for (const m of mutations) {
+        if (
+          m.type === 'attributes' &&
+          (m.attributeName === 'class' || m.attributeName === 'style')
+        ) {
+          const target = m.target;
+          if (
+            target &&
+            (target.classList?.contains('vditor-wysiwyg') ||
+              target.classList?.contains('vditor-ir') ||
+              target.classList?.contains('vditor-sv') ||
+              target.id === 'vditor')
+          ) {
+            modeChanged = true;
+            break;
+          }
+        }
+      }
+      if (modeChanged) {
+        if (modeDebounceTimer) clearTimeout(modeDebounceTimer);
+        modeDebounceTimer = setTimeout(() => {
+          renderInlineZones();
+          syncZonePositions();
+        }, 60);
+      }
+    });
+    mo.observe(rootEl, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+      subtree: true
+    });
   }
 
   function focusCommentById(commentId, anchorText) {

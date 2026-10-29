@@ -174,7 +174,8 @@ handler.on("open", async (md) => {
       handler.emit('mermaidTheme', theme)
     },
     changeEditMode(mode) {
-      handler.emit('editMode', mode)
+      handler.emit('editMode', mode);
+      setTimeout(() => omniAnnotations?.refreshHighlights(getMarkdownValue()), 80);
     },
     onSettingsChange(settings) {
       handler.emit('syncViewerSettings', settings)
@@ -249,6 +250,7 @@ handler.on("open", async (md) => {
         }
         if (update.editMode !== undefined) {
           editor.switchEditMode(update.editMode);
+          setTimeout(() => omniAnnotations?.refreshHighlights(getMarkdownValue()), 80);
         }
       });
       handler.on('proStatus', ({ isPro, isProCancelled }) => {

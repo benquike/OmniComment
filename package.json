@@ -150,7 +150,7 @@
     "menus": {
       "editor/context": [
         {
-          "when": "(editorLangId == markdown || editorLangId == skill) && editorHasSelection",
+          "when": "editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill",
           "command": "omnicomment.addComment",
           "group": "omnicomment"
         }

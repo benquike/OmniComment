@@ -104,7 +104,7 @@ suite('Extension Test Suite', () => {
 
       assert.strictEqual(
         editorContextWhen,
-        '(editorLangId == markdown || editorLangId == skill) && editorHasSelection'
+        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill'
       );
       assert.strictEqual(
         editorTitleWhen,
