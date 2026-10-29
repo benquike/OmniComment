@@ -1,0 +1,72 @@
+=======================================================
+OmniComment Plain Text (.txt) Mode Demo & Verification
+=======================================================
+
+Welcome to OmniComment testing in plain text editor mode!
+
+OmniComment now fully supports plain text files (.txt, .text)
+as well as standard VS Code TextEditor mode.
+
+You can verify all features right here:
+
+1. Visual Lightbulb Quick Fix:
+   Highlight the phrase "critical system requirements" below.
+   Notice the 💡 lightbulb quick action appears offering:
+   "💬 Add OmniComment on 'critical system requirements'".
+
+2. Status Bar Quick Action:
+   Highlight any text. Look at the bottom-right status bar:
+   "$(comment) Add Comment" is clickable to submit a comment.
+
+3. Context Menu:
+   Right-click anywhere or on selected text:
+   "Add Comment" appears right at the top above Cut/Copy/Paste.
+
+4. Keyboard Shortcut:
+   Select any word and press Ctrl+Shift+M (or Cmd+Shift+M).
+
+5. Gutter Icon & Inline Discussion:
+   Look at line 30 below where an active comment thread is anchored.
+   Notice the gold 💬 comment bubble in the line number gutter!
+   Hover over the highlighted text to view details or click the gutter
+   icon to open the interactive discussion thread.
+
+--- Sample Section for Testing ---
+
+Performance Specifications:
+- High availability architecture with 99.99% uptime guarantee.
+- Network latency target: critical system requirements demand p99 < 15ms.
+- Scalability target: 50,000 requests per second.
+
+Meeting Notes:
+- Review API backwards-compatibility before next week's release.
+- Ensure all comments persist cleanly in the storage block at file end.
+
+<!-- omnicomment
+{
+  "version": 2,
+  "comments": [
+    {
+      "id": "demo-txt-comment-001",
+      "anchor": {
+        "text": "critical system requirements",
+        "startLine": 29,
+        "startChar": 26,
+        "endLine": 29,
+        "endChar": 54
+      },
+      "content": "SLA approved: p99 latency target verified under load testing.",
+      "author": "TechLead",
+      "createdAt": "2026-10-29T15:40:00.000Z",
+      "replies": [
+        {
+          "id": "demo-txt-reply-001",
+          "content": "Acknowledged. Benchmarks added to CI.",
+          "author": "Developer",
+          "createdAt": "2026-10-29T15:42:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+-->

@@ -464,7 +464,7 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       const ctx = await getActiveMarkdownContext();
       if (!ctx) {
-        vscode.window.showErrorMessage('Please open a Markdown or SKILL file to add comments');
+        vscode.window.showErrorMessage('Please open a Markdown, text, or SKILL file to add comments');
         return;
       }
 
@@ -491,7 +491,7 @@ export function activate(context: vscode.ExtensionContext) {
     async (content: string, anchorText?: string) => {
       const ctx = await getActiveMarkdownContext();
       if (!ctx) {
-        vscode.window.showErrorMessage('Please open a Markdown or SKILL file to add comments');
+        vscode.window.showErrorMessage('Please open a Markdown, text, or SKILL file to add comments');
         return;
       }
 
@@ -538,7 +538,7 @@ export function activate(context: vscode.ExtensionContext) {
     async (commentId: string) => {
       const ctx = await getActiveMarkdownContext();
       if (!ctx) {
-        vscode.window.showErrorMessage('Please open a Markdown or SKILL file');
+        vscode.window.showErrorMessage('Please open a Markdown, text, or SKILL file');
         return;
       }
 
@@ -1412,7 +1412,7 @@ async function addCommentCommand(arg?: unknown) {
 
   const ctx = await getActiveMarkdownContext(preferredUri);
   if (!ctx) {
-    vscode.window.showErrorMessage('Please open a Markdown or SKILL file to add comments');
+    vscode.window.showErrorMessage('Please open a Markdown, text, or SKILL file to add comments');
     return;
   }
 
