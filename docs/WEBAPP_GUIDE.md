@@ -28,8 +28,8 @@ The OmniComment Web SDK (`@omnicomment/web-plugin`) brings the exact same commen
 flowchart TD
     subgraph Browser ["Web Application Browser Runtime"]
         DOM["Target Article / Document Container\n(#article-content, .markdown-body)"]
-        SDK["@omnicomment/web-plugin SDK\n(AnchorEngine & TextQuoteSelector)"]
-        UI["<omni-comment> Custom Element\n(Shadow DOM / Isolated CSS)"]
+        SDK["@omnicomment/web-plugin SDK\n(AnchorEngine and TextQuoteSelector)"]
+        UI["omni-comment Custom Element\n(Shadow DOM / Isolated CSS)"]
         
         DOM <--> SDK
         SDK <--> UI

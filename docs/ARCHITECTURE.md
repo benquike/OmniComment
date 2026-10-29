@@ -8,10 +8,10 @@ This document outlines the architectural principles, data schemas, modular packa
 
 1. [Architectural Principles](#1-architectural-principles)
 2. [Monorepo Package Structure](#2-monorepo-package-structure)
-3. [Data Model & W3C Web Annotation Compliance](#3-data-model--w3c-web-annotation-compliance)
+3. [Data Model &amp; W3C Web Annotation Compliance](#3-data-model--w3c-web-annotation-compliance)
 4. [3-Tier Robust Anchoring Engine](#4-3-tier-robust-anchoring-engine)
-5. [Inline Zone & Zero-DOM Layout Engine](#5-inline-zone--zero-dom-layout-engine)
-6. [Component & Sequence Diagrams](#6-component--sequence-diagrams)
+5. [Inline Zone &amp; Zero-DOM Layout Engine](#5-inline-zone--zero-dom-layout-engine)
+6. [Component &amp; Sequence Diagrams](#6-component--sequence-diagrams)
 
 ---
 
@@ -182,7 +182,7 @@ graph TD
 
     subgraph Surfaces ["Surface Adapters"]
         VSCode[VS Code Extension]
-        WebComponent["<omni-comment> Web Component"]
+        WebComponent["omni-comment Web Component"]
         ChromeExt[Chrome Extension MV3]
     end
 
@@ -223,3 +223,34 @@ sequenceDiagram
     Storage->>UI: Update Thread to Resolved
     UI->>UI: Collapse Thread (Zero-DOM)
 ```
+
+<!-- omnicomment
+{
+  "version": 2,
+  "comments": [
+    {
+      "id": "f274f1a3-5cf9-4481-b23f-b38cadc92d8e",
+      "anchor": {
+        "text": "Component Architecture",
+        "startLine": 165,
+        "startChar": 4,
+        "endLine": 165,
+        "endChar": 26
+      },
+      "content": "this diagram could not be rendered either, please fix it",
+      "author": "Hui Peng",
+      "createdAt": "2026-10-29T07:17:11.019Z",
+      "resolved": true,
+      "updatedAt": "2026-10-29T07:22:00.000Z",
+      "replies": [
+        {
+          "id": "reply-fix-component-diagram",
+          "content": "Fixed! Removed unescaped `<omni-comment>` HTML tag from the node label, resolving the Mermaid syntax error.",
+          "author": "Jetski",
+          "createdAt": "2026-10-29T07:22:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+-->
