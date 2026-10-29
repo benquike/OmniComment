@@ -8,12 +8,19 @@ export class CommentDecorator {
   private decorationType: vscode.TextEditorDecorationType;
   private focusedDecorationType: vscode.TextEditorDecorationType;
   private focusedCommentId: string | null = null;
+  private gutterIconUri?: vscode.Uri;
 
-  constructor() {
+  constructor(extensionUri?: vscode.Uri) {
+    if (extensionUri) {
+      this.gutterIconUri = vscode.Uri.joinPath(extensionUri, 'media', 'comment-gutter.svg');
+    }
     this.decorationType = this.createDecorationType(false);
     this.focusedDecorationType = this.createDecorationType(true);
   }
 
+  // Invariant: Configures editor decoration styles including yellow background and gutter comment icon.
+  // Why: Provides immediate visual indication on both the text range and the editor gutter line.
+  // Example: creates decoration with rgba(255, 212, 0, 0.3) background and comment-gutter.svg icon.
   private createDecorationType(isFocused: boolean): vscode.TextEditorDecorationType {
     const omniConfig = vscode.workspace.getConfiguration('omnicomment');
     const baseColor = omniConfig.get<string>('highlightColor', 'rgba(255, 212, 0, 0.3)');
@@ -23,6 +30,8 @@ export class CommentDecorator {
       backgroundColor: isFocused ? 'rgba(255, 212, 0, 0.5)' : baseColor,
       borderRadius: '3px',
       border: `1px solid ${borderColor}`,
+      gutterIconPath: this.gutterIconUri,
+      gutterIconSize: 'contain',
       overviewRulerColor: borderColor,
       overviewRulerLane: vscode.OverviewRulerLane.Right,
       cursor: 'pointer',
@@ -50,9 +59,15 @@ export class CommentDecorator {
         continue;
       }
 
+      const hoverMd = new vscode.MarkdownString(
+        `💬 **@${comment.author}** · *${comment.createdAt.slice(0, 10)}*\n\n${comment.content}\n\n---\n[$(comment-discussion) Open Comment Thread](command:omnicomment.navigateToComment?${encodeURIComponent(JSON.stringify([comment.id]))})`,
+        true
+      );
+      hoverMd.isTrusted = true;
+
       const decorationOptions: vscode.DecorationOptions = {
         range,
-        hoverMessage: new vscode.MarkdownString(`**Comment:** ${comment.content}`)
+        hoverMessage: hoverMd
       };
 
       if (comment.id === this.focusedCommentId) {

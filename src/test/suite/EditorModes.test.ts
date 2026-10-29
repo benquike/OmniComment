@@ -8,8 +8,10 @@ import {
   getActiveMarkdownContext,
   getCommentServiceForTesting,
   getInlineCommentControllerForTesting,
-  queryMarkdownEditorInlineStateForTesting
+  queryMarkdownEditorInlineStateForTesting,
+  resolveAnchorSelectionForThread
 } from '../../extension';
+import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
@@ -378,5 +380,84 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
       assert.strictEqual(state.threadCount, 1);
       assert.ok(state.threads[0].text.includes(customText));
     }
+  });
+
+  // Topology: .txt file -> openTextDocument -> omnicomment.editorCommentAction -> parseComments
+  // Expected: .txt document resolves in getActiveMarkdownContext, comment persists in comment block, inline thread created.
+  test('Mode 1E: Plain text (.txt) document support in standard text editor', async () => {
+    const filePath = path.join(tempDir, 'notes.txt');
+    fs.writeFileSync(
+      filePath,
+      'Meeting Notes\n\nDiscussion about release milestones and deadlines.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    await vscode.window.showTextDocument(document);
+
+    const ctx = await getActiveMarkdownContext(fileUri);
+    assert.ok(ctx, 'Plain text (.txt) file should resolve in getActiveMarkdownContext');
+    assert.strictEqual(ctx?.document.uri.fsPath, fileUri.fsPath);
+
+    const anchorPhrase = 'release milestones';
+    const commentText = 'Clarify deadlines for v1.0';
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: anchorPhrase,
+      content: commentText
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 1;
+    });
+
+    const comments = commentService.parseComments(document);
+    assert.strictEqual(comments.length, 1);
+    assert.strictEqual(comments[0].anchor.text, anchorPhrase);
+    assert.strictEqual(comments[0].content, commentText);
+
+    const inlineController = getInlineCommentControllerForTesting();
+    assert.strictEqual(inlineController.getThreadCount(fileUri), 1);
+  });
+
+  // Topology: Text selection in document -> CommentCodeActionProvider.provideCodeActions -> CodeAction array
+  // Expected: Returns Refactor action with title containing selected text and command 'omnicomment.addComment'.
+  test('Mode 1F: CommentCodeActionProvider provides lightbulb action on selection', async () => {
+    const filePath = path.join(tempDir, 'codeaction-test.txt');
+    fs.writeFileSync(filePath, 'Important paragraph to highlight in plain text.\n', 'utf-8');
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+
+    const provider = new CommentCodeActionProvider();
+    const range = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 9));
+    const actions = provider.provideCodeActions(
+      document,
+      range,
+      { diagnostics: [], triggerKind: vscode.CodeActionTriggerKind.Invoke, only: undefined },
+      new vscode.CancellationTokenSource().token
+    );
+
+    assert.ok(actions.length > 0, 'CodeActionProvider should produce an action for non-empty selection');
+    const firstAction = actions[0] as vscode.CodeAction;
+    assert.ok(firstAction.title.includes('Add OmniComment'));
+    assert.strictEqual(firstAction.command?.command, 'omnicomment.addComment');
+  });
+
+  // Topology: Blank line Range -> resolveAnchorSelectionForThread -> nearest non-empty line Selection
+  // Expected: Finds nearest non-empty line downward or upward instead of failing on empty selection.
+  test('Mode 1G: resolveAnchorSelectionForThread recovers from blank line ranges', async () => {
+    const filePath = path.join(tempDir, 'blank-lines.txt');
+    fs.writeFileSync(filePath, '\n\nTarget content line.\n\n', 'utf-8');
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+
+    // Range on blank line 0
+    const blankRange = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 0));
+    const resolved = resolveAnchorSelectionForThread(document, blankRange);
+    const resolvedText = document.getText(resolved).trim();
+    assert.strictEqual(resolvedText, 'Target content line.');
   });
 });

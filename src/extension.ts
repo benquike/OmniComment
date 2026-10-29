@@ -9,6 +9,7 @@ import {
   InlineCommentController,
   OmniCommentInlineItem
 } from './providers/InlineCommentController';
+import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 
 let commentService: CommentService;
@@ -110,11 +111,18 @@ const MARKDOWN_EXTENSIONS = [
   '.mdwn',
   '.mdtxt',
   '.mdtext',
-  '.skill'
+  '.skill',
+  '.txt',
+  '.text'
 ];
 
 export function isMarkdownCompatibleLanguage(languageId: string): boolean {
-  return languageId === 'markdown' || languageId === 'skill';
+  return (
+    languageId === 'markdown' ||
+    languageId === 'skill' ||
+    languageId === 'plaintext' ||
+    languageId === 'text'
+  );
 }
 
 export function isMarkdownCompatibleUri(uri: vscode.Uri): boolean {
@@ -340,7 +348,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize services
   commentService = new CommentService();
-  commentDecorator = new CommentDecorator();
+  commentDecorator = new CommentDecorator(context.extensionUri);
   inlineCommentController = new InlineCommentController();
   context.subscriptions.push(inlineCommentController);
 
@@ -605,6 +613,57 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
+  // Register Code Action Provider for in-editor selection quick actions
+  // Invariant: Presents a visible lightbulb quick action when text is selected in standard text editors.
+  // Why: Users in TextEditor mode see a prominent interactive prompt equivalent to the WYSIWYG comment chip.
+  // Example: Selecting "heading" displays lightbulb "💬 Add OmniComment on \"heading\"".
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      [
+        { language: 'markdown' },
+        { language: 'skill' },
+        { language: 'plaintext' },
+        { language: 'text' }
+      ],
+      new CommentCodeActionProvider(),
+      {
+        providedCodeActionKinds: CommentCodeActionProvider.providedCodeActionKinds
+      }
+    )
+  );
+
+  // Status bar button for text editor commenting
+  // Invariant: Displays an interactive status bar item when editing text/markdown documents.
+  // Why: Gives an always-accessible clickable control to trigger OmniComment in any text editor.
+  // Example: Clicking "$(comment) Add Comment" invokes omnicomment.addComment.
+  const commentStatusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100
+  );
+  commentStatusBarItem.command = 'omnicomment.addComment';
+  context.subscriptions.push(commentStatusBarItem);
+
+  const updateStatusBar = (editor?: vscode.TextEditor): void => {
+    if (!editor || !isMarkdownCompatibleLanguage(editor.document.languageId)) {
+      commentStatusBarItem.hide();
+      return;
+    }
+    const hasSelection = !editor.selection.isEmpty;
+    commentStatusBarItem.text = hasSelection
+      ? '$(comment) Add Comment'
+      : '$(comment) OmniComment';
+    commentStatusBarItem.tooltip = hasSelection
+      ? `Add OmniComment on "${editor.document.getText(editor.selection).slice(0, 30)}..." (Ctrl+Shift+M)`
+      : 'Add OmniComment at cursor (Ctrl+Shift+M)';
+    commentStatusBarItem.show();
+  };
+
+  updateStatusBar(vscode.window.activeTextEditor);
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(updateStatusBar),
+    vscode.window.onDidChangeTextEditorSelection(e => updateStatusBar(e.textEditor))
+  );
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand('omnicomment.addComment', addCommentCommand)
@@ -807,18 +866,13 @@ export function activate(context: vscode.ExtensionContext) {
           await saveDocumentIfCustomEditor({ document: doc, editor });
           await refreshForContext(doc, editor);
         } else {
-          const range = reply.thread.range;
-          let selection: vscode.Selection;
-          if (!range || range.isEmpty) {
-            const lineNum = range ? range.start.line : 0;
-            selection = expandSelectionAtCursor(doc, new vscode.Position(lineNum, 0));
-          } else {
-            selection = new vscode.Selection(range.start, range.end);
-          }
+          const selection = resolveAnchorSelectionForThread(doc, reply.thread.range);
           reply.thread.dispose();
-          await commentService.addComment(doc, selection, reply.text.trim());
-          await saveDocumentIfCustomEditor({ document: doc, editor });
-          await refreshForContext(doc, editor);
+          const comment = await commentService.addComment(doc, selection, reply.text.trim());
+          if (comment) {
+            await saveDocumentIfCustomEditor({ document: doc, editor });
+            await refreshForContext(doc, editor);
+          }
         }
       }
     ),
@@ -1264,6 +1318,44 @@ function expandSelectionAtCursor(document: vscode.TextDocument, position: vscode
 
   // If no word found at cursor, select entire line
   return new vscode.Selection(line.range.start, line.range.end);
+}
+
+// Invariant: Resolves a valid non-empty anchor selection for a newly created comment thread range.
+// Why: When user clicks gutter (+) on empty or whitespace lines, standard selection is empty causing comment addition to fail.
+// Example: Range on blank line 5 resolves to non-blank line 6 text selection.
+export function resolveAnchorSelectionForThread(
+  document: vscode.TextDocument,
+  range?: vscode.Range
+): vscode.Selection {
+  if (range && !range.isEmpty) {
+    const directText = document.getText(range).trim();
+    if (directText.length > 0) {
+      return new vscode.Selection(range.start, range.end);
+    }
+  }
+
+  const baseLine = range ? range.start.line : 0;
+  const clampedLine = Math.min(Math.max(0, baseLine), Math.max(0, document.lineCount - 1));
+
+  // Check target line first
+  const currentLineText = document.lineAt(clampedLine).text.trim();
+  if (currentLineText.length > 0) {
+    return expandSelectionAtCursor(document, new vscode.Position(clampedLine, 0));
+  }
+
+  // Scan downward, then upward for nearest non-empty line
+  for (let offset = 1; offset < document.lineCount; offset++) {
+    const downLine = clampedLine + offset;
+    if (downLine < document.lineCount && document.lineAt(downLine).text.trim().length > 0) {
+      return expandSelectionAtCursor(document, new vscode.Position(downLine, 0));
+    }
+    const upLine = clampedLine - offset;
+    if (upLine >= 0 && document.lineAt(upLine).text.trim().length > 0) {
+      return expandSelectionAtCursor(document, new vscode.Position(upLine, 0));
+    }
+  }
+
+  return new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
 }
 
 // Invariant: Prompts user for comment text in standard TextEditor mode using VS Code input box.

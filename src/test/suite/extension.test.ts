@@ -66,13 +66,14 @@ suite('Extension Test Suite', () => {
   });
 
   suite('Language Compatibility', () => {
-    test('Should treat skill language as markdown-compatible', () => {
+    test('Should treat skill and plaintext languages as compatible', () => {
       assert.strictEqual(isMarkdownCompatibleLanguage('markdown'), true);
       assert.strictEqual(isMarkdownCompatibleLanguage('skill'), true);
-      assert.strictEqual(isMarkdownCompatibleLanguage('plaintext'), false);
+      assert.strictEqual(isMarkdownCompatibleLanguage('plaintext'), true);
+      assert.strictEqual(isMarkdownCompatibleLanguage('typescript'), false);
     });
 
-    test('Package contribution contexts should include skill language', () => {
+    test('Package contribution contexts should include skill and plaintext languages', () => {
       const extension =
         vscode.extensions.getExtension('benquike.omnicomment') ||
         vscode.extensions.getExtension('OrenMaoz.omnicomment');
@@ -83,6 +84,7 @@ suite('Extension Test Suite', () => {
       assert.ok(packageJson);
 
       assert.ok(packageJson.activationEvents.includes('onLanguage:skill'));
+      assert.ok(packageJson.activationEvents.includes('onLanguage:plaintext'));
 
       const editorContextMenuItem = packageJson.contributes.menus['editor/context'].find(
         (item: { command: string }) => item.command === 'omnicomment.addComment'
@@ -104,25 +106,28 @@ suite('Extension Test Suite', () => {
 
       assert.strictEqual(
         editorContextWhen,
-        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text'
       );
       assert.strictEqual(
         editorTitleWhen,
-        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
       assert.strictEqual(
         keybindingWhen,
-        'editorLangId == markdown || editorLangId == skill || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
     });
 
     test('Should recognize markdown-compatible URIs and custom editor tab inputs', () => {
       const mdUri = vscode.Uri.file('/workspace/docs/README.md');
       const skillUri = vscode.Uri.file('/workspace/skills/SKILL.skill');
+      const txtUri = vscode.Uri.file('/workspace/docs/notes.txt');
       const tsUri = vscode.Uri.file('/workspace/src/index.ts');
 
       assert.strictEqual(isMarkdownCompatibleUri(mdUri), true);
       assert.strictEqual(isMarkdownCompatibleUri(skillUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(txtUri), true);
+      assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
       assert.strictEqual(isMarkdownCompatibleUri(tsUri), false);
 
       // Simulate TabInputCustom (e.g., "Markdown Editor")

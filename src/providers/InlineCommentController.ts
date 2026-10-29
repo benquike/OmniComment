@@ -53,12 +53,23 @@ export class InlineCommentController implements vscode.Disposable {
 
     this._controller.commentingRangeProvider = {
       provideCommentingRanges: (document: vscode.TextDocument) => {
-        const isMarkdownLang = document.languageId === 'markdown' || document.languageId === 'skill';
+        const isSupportedLang =
+          document.languageId === 'markdown' ||
+          document.languageId === 'skill' ||
+          document.languageId === 'plaintext' ||
+          document.languageId === 'text';
         const lowerPath = document.uri.path.toLowerCase();
-        const isMarkdownFile = ['.md', '.markdown', '.mdown', '.mkdn', '.mkd', '.skill'].some(ext =>
-          lowerPath.endsWith(ext)
-        );
-        if (!isMarkdownLang && !isMarkdownFile) {
+        const isSupportedFile = [
+          '.md',
+          '.markdown',
+          '.mdown',
+          '.mkdn',
+          '.mkd',
+          '.skill',
+          '.txt',
+          '.text'
+        ].some(ext => lowerPath.endsWith(ext));
+        if (!isSupportedLang && !isSupportedFile) {
           return [];
         }
         // Invariant: The comment storage block at the bottom of the document should not be commented on.
@@ -111,19 +122,32 @@ export class InlineCommentController implements vscode.Disposable {
       }
       activeIds.add(comment.id);
 
+      const rawStart =
+        typeof comment.anchor.startLine === 'number'
+          ? comment.anchor.startLine
+          : ((comment.anchor as any).line ?? 0);
+      const rawEnd =
+        typeof comment.anchor.endLine === 'number'
+          ? comment.anchor.endLine
+          : rawStart;
+      const rawStartChar =
+        typeof comment.anchor.startChar === 'number' ? comment.anchor.startChar : 0;
+      const rawEndChar =
+        typeof comment.anchor.endChar === 'number' ? comment.anchor.endChar : 0;
+
       const startLine = Math.min(
-        Math.max(0, comment.anchor.startLine),
+        Math.max(0, rawStart),
         Math.max(0, document.lineCount - 1)
       );
       const endLine = Math.min(
-        Math.max(startLine, comment.anchor.endLine),
+        Math.max(startLine, rawEnd),
         Math.max(0, document.lineCount - 1)
       );
       const range = new vscode.Range(
         startLine,
-        Math.max(0, comment.anchor.startChar),
+        Math.max(0, rawStartChar),
         endLine,
-        Math.max(0, comment.anchor.endChar)
+        Math.max(0, rawEndChar)
       );
 
       const lineLabel = InlineCommentController.formatLineLabel(comment);
