@@ -485,6 +485,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   const collapsedComments = new Set(); // commentIds whose inline box is collapsed to a 1-line header bar
   const collapsedReplies = new Set(); // commentIds whose responses list is collapsed
   let activeEditCommentId = null;
+  let activeBlockCounts = new Map(); // blockEl -> number of active comments on this block
 
   // Inline new-comment draft state
   let newCommentDraft = null; // { anchorText: string, blockEl: Element | null }
@@ -635,6 +636,15 @@ export function initOmniAnnotations(getMarkdownValue) {
     zonesLayer.id = 'omni-inline-zones-layer';
     zonesLayer.className = 'omni-inline-zones-layer';
     document.body.appendChild(zonesLayer);
+  }
+
+  // 2b. Dedicated Gutter Chip Layer (DOM-level bulletproof reliability across all block types & headings)
+  let gutterLayer = document.getElementById('omni-gutter-layer');
+  if (!gutterLayer) {
+    gutterLayer = document.createElement('div');
+    gutterLayer.id = 'omni-gutter-layer';
+    gutterLayer.className = 'omni-gutter-layer';
+    document.body.appendChild(gutterLayer);
   }
 
   // 3. Floating Selection "💬 Comment" Chip on text selection
@@ -850,8 +860,9 @@ export function initOmniAnnotations(getMarkdownValue) {
   function syncZonePositions() {
     const root = document.getElementById('vditor');
     const contentRoot = getContentRoot();
-    if (!root || !contentRoot || activeZones.length === 0) {
+    if (!root || !contentRoot) {
       zoneStyleEl.textContent = '';
+      if (gutterLayer) gutterLayer.replaceChildren();
       return;
     }
 
@@ -863,6 +874,9 @@ export function initOmniAnnotations(getMarkdownValue) {
     const clipLeft = Math.max(0, viewportRect.left);
     const clipRight = Math.max(0, window.innerWidth - viewportRect.right);
     zonesLayer.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)`;
+    if (gutterLayer) {
+      gutterLayer.style.clipPath = `inset(${clipTop}px ${clipRight}px ${clipBottom}px 0px)`;
+    }
 
     const cssRules = [];
     for (const zone of activeZones) {
@@ -879,7 +893,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       cssRules.push(
-        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 8}px !important; }`
+        `[data-omni-zone="${zoneId}"] { margin-bottom: ${zoneHeight + 4}px !important; }`
       );
     }
 
@@ -897,10 +911,10 @@ export function initOmniAnnotations(getMarkdownValue) {
         continue;
       }
       const blockRect = blockEl.getBoundingClientRect();
-      const top = Math.round(blockRect.bottom + 4);
+      const top = Math.round(blockRect.bottom + 2);
       const left = Math.round(blockRect.left);
-      const maxCardWidth = 540;
-      const width = Math.min(maxCardWidth, Math.max(320, Math.round(blockRect.width)));
+      const maxCardWidth = 420;
+      const width = Math.min(maxCardWidth, Math.max(280, Math.round(blockRect.width)));
 
       zoneEl.style.top = `${top}px`;
       zoneEl.style.left = `${left}px`;
@@ -922,6 +936,72 @@ export function initOmniAnnotations(getMarkdownValue) {
         arrowEl.style.left = `${arrowOffset}px`;
       }
     }
+
+    // Render interactive DOM gutter chips for all blocks with comments
+    if (gutterLayer) {
+      gutterLayer.replaceChildren();
+      for (const [blockEl, count] of activeBlockCounts.entries()) {
+        if (!blockEl || !blockEl.isConnected || !contentRoot.contains(blockEl)) {
+          continue;
+        }
+        const bRect = blockEl.getBoundingClientRect();
+        if (
+          bRect.bottom <= clipTop ||
+          bRect.top >= window.innerHeight - clipBottom ||
+          (bRect.width === 0 && bRect.height === 0)
+        ) {
+          continue;
+        }
+
+        const blockItems = commentRanges.filter(i => i.blockEl === blockEl);
+        const isCollapsed =
+          blockItems.length > 0 &&
+          blockItems.every(i => collapsedComments.has(i.comment.id));
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `omni-gutter-chip ${isCollapsed ? 'is-collapsed' : ''}`;
+        chip.setAttribute(
+          'aria-label',
+          `${isCollapsed ? 'Expand' : 'Collapse'} comments (${count})`
+        );
+        chip.title = `${isCollapsed ? 'Click to show' : 'Click to hide'} ${count} ${
+          count === 1 ? 'comment' : 'comments'
+        }`;
+
+        const chipTop = Math.round(
+          bRect.top + (bRect.height > 36 ? 4 : Math.max(0, (bRect.height - 22) / 2))
+        );
+        const chipLeft = Math.max(4, Math.round(bRect.left - 28));
+
+        chip.style.top = `${chipTop}px`;
+        chip.style.left = `${chipLeft}px`;
+
+        chip.innerHTML = `💬${
+          count > 1 ? `<span class="omni-gutter-chip__badge">${count}</span>` : ''
+        }`;
+
+        chip.addEventListener('click', e => {
+          e.stopPropagation();
+          e.preventDefault();
+          const items = commentRanges.filter(i => i.blockEl === blockEl);
+          if (items.length > 0) {
+            const allCol = items.every(i => collapsedComments.has(i.comment.id));
+            for (const item of items) {
+              if (allCol) {
+                collapsedComments.delete(item.comment.id);
+                focusedCommentId = item.comment.id;
+              } else {
+                collapsedComments.add(item.comment.id);
+              }
+            }
+            renderInlineZones();
+          }
+        });
+
+        gutterLayer.appendChild(chip);
+      }
+    }
   }
 
   function renderThreadHtml(comment) {
@@ -934,29 +1014,52 @@ export function initOmniAnnotations(getMarkdownValue) {
     const areRepliesCollapsed = collapsedReplies.has(comment.id);
     const isEditing = activeEditCommentId === comment.id;
     const lineLabel = formatLineLabel(comment.anchor);
-    const statusLabel = comment.resolved ? 'Resolved' : 'Unresolved';
     const thumbsCount = (comment.thumbsUp || []).length;
 
     return `
       <div class="omni-inline-thread ${isFocused ? 'is-focused' : ''} ${
       comment.resolved ? 'is-resolved' : ''
     }" data-comment-id="${escapeHtml(comment.id)}">
+        <!-- Compact Single-Row Header (24px) -->
         <div class="omni-inline-thread__header">
-          <div class="omni-inline-thread__header-left">
-            <span class="omni-inline-thread__status ${
-              comment.resolved ? 'is-resolved' : 'is-unresolved'
-            }">${statusLabel}</span>
-            <span class="omni-inline-thread__anchor-pill" title="Anchored on ${escapeHtml(
-              lineLabel
-            )}: &quot;${escapeHtml(comment.anchor?.text || '')}&quot;">
-              "${escapeHtml(comment.anchor?.text || '')}"
-            </span>
+          <div class="omni-inline-thread__header-left" data-action="toggle-collapse-comment" data-comment-id="${escapeHtml(
+            comment.id
+          )}" title="Click to toggle collapse">
+            <span class="omni-inline-author">${escapeHtml(comment.author || 'User')}</span>
+            <span class="omni-inline-sep">·</span>
+            <span class="omni-inline-time">${escapeHtml(
+              formatRelativeTime(comment.createdAt)
+            )}</span>
+            ${
+              comment.resolved
+                ? '<span class="omni-inline-status-badge is-resolved">Resolved</span>'
+                : ''
+            }
+            ${
+              comment.anchor?.text
+                ? `<span class="omni-inline-anchor-pill" title="Anchored on ${escapeHtml(
+                    lineLabel
+                  )}: &quot;${escapeHtml(comment.anchor.text)}&quot;">&ldquo;${escapeHtml(
+                    comment.anchor.text
+                  )}&rdquo;</span>`
+                : ''
+            }
           </div>
           <div class="omni-inline-thread__header-actions">
+            <button type="button" class="omni-inline-header-btn" data-action="thumbs-up" data-comment-id="${escapeHtml(
+              comment.id
+            )}" title="Thumbs up">
+              👍${thumbsCount > 0 ? `<span style="font-size:10px;margin-left:2px">${thumbsCount}</span>` : ''}
+            </button>
             <button type="button" class="omni-inline-header-btn" data-action="toggle-resolve" data-comment-id="${escapeHtml(
               comment.id
             )}" title="${comment.resolved ? 'Reopen comment' : 'Resolve comment'}">
               <i class="codicon codicon-${comment.resolved ? 'issue-reopened' : 'check'}"></i>
+            </button>
+            <button type="button" class="omni-inline-header-btn" data-action="start-edit" data-comment-id="${escapeHtml(
+              comment.id
+            )}" title="Edit comment">
+              <i class="codicon codicon-edit"></i>
             </button>
             <button type="button" class="omni-inline-header-btn is-danger" data-action="delete-comment" data-comment-id="${escapeHtml(
               comment.id
@@ -972,26 +1075,8 @@ export function initOmniAnnotations(getMarkdownValue) {
         </div>
 
         <div class="omni-inline-thread__body">
-            <!-- Root Comment -->
+            <!-- Root Comment Text -->
             <div class="omni-inline-item omni-inline-item--root">
-              <div class="omni-inline-item__meta">
-                <span class="omni-inline-item__author">${escapeHtml(comment.author)}</span>
-                <span class="omni-inline-item__time">${escapeHtml(
-                  formatRelativeTime(comment.createdAt)
-                )}</span>
-                <div class="omni-inline-item__actions">
-                  <button type="button" class="omni-inline-item-btn" data-action="thumbs-up" data-comment-id="${escapeHtml(
-                    comment.id
-                  )}" title="Thumbs up">
-                    👍${thumbsCount > 0 ? ` ${thumbsCount}` : ''}
-                  </button>
-                  <button type="button" class="omni-inline-item-btn" data-action="start-edit" data-comment-id="${escapeHtml(
-                    comment.id
-                  )}" title="Edit comment">
-                    Edit
-                  </button>
-                </div>
-              </div>
               ${
                 isEditing
                   ? `
@@ -1068,23 +1153,19 @@ export function initOmniAnnotations(getMarkdownValue) {
                 : ''
             }
 
-            <!-- Inline Reply... Box (matching screenshots/inline-comment.png) -->
+            <!-- Compact Inline Reply Box (NO duplicate Resolve button!) -->
             <div class="omni-inline-reply-container" data-reply-container="${escapeHtml(
               comment.id
             )}">
-              <textarea
+              <input
+                type="text"
                 id="omni-reply-input-${escapeHtml(comment.id)}"
                 class="omni-inline-reply-input"
-                rows="1"
                 data-comment-id="${escapeHtml(comment.id)}"
-                placeholder="Reply..."
-              ></textarea>
+                placeholder="Reply... (Enter to reply)"
+                autocomplete="off"
+              />
               <div class="omni-inline-reply-actions">
-                <button type="button" class="omni-inline-btn is-secondary" data-action="toggle-resolve" data-comment-id="${escapeHtml(
-                  comment.id
-                )}">
-                  ${comment.resolved ? 'Reopen' : 'Resolve'}
-                </button>
                 <button type="button" class="omni-inline-btn is-secondary" data-action="cancel-reply" data-comment-id="${escapeHtml(
                   comment.id
                 )}">
@@ -1098,7 +1179,6 @@ export function initOmniAnnotations(getMarkdownValue) {
               </div>
             </div>
           </div>
-        </div>
       </div>
     `;
   }
@@ -1108,17 +1188,19 @@ export function initOmniAnnotations(getMarkdownValue) {
       <div class="omni-inline-thread omni-inline-new-comment is-focused">
         <div class="omni-inline-thread__header">
           <div class="omni-inline-thread__header-left">
-            <span class="omni-inline-thread__status is-unresolved">New Comment</span>
+            <span class="omni-inline-author">New Comment</span>
             ${
               draft.anchorText
-                ? `<span class="omni-inline-thread__anchor-pill">"${escapeHtml(
+                ? `<span class="omni-inline-anchor-pill">&ldquo;${escapeHtml(
                     draft.anchorText
-                  )}"</span>`
+                  )}&rdquo;</span>`
                 : ''
             }
           </div>
           <div class="omni-inline-thread__header-actions">
-            <button type="button" class="omni-inline-header-btn" data-action="cancel-new-comment" title="Cancel">✕</button>
+            <button type="button" class="omni-inline-header-btn" data-action="cancel-new-comment" title="Cancel">
+              <i class="codicon codicon-close"></i>
+            </button>
           </div>
         </div>
         <div class="omni-inline-thread__body">
@@ -1126,8 +1208,7 @@ export function initOmniAnnotations(getMarkdownValue) {
             !draft.anchorText
               ? `
             <div class="omni-inline-field">
-              <label class="omni-inline-label">Target text in Markdown:</label>
-              <input id="omni-inline-new-comment-anchor" class="omni-inline-anchor-input" type="text" placeholder="Enter target phrase from document..." value="" />
+              <input id="omni-inline-new-comment-anchor" class="omni-inline-anchor-input" type="text" placeholder="Target text in Markdown..." value="" />
             </div>
           `
               : `<input id="omni-inline-new-comment-anchor" type="hidden" value="${escapeHtml(
@@ -1256,7 +1337,7 @@ export function initOmniAnnotations(getMarkdownValue) {
               );
               if (input) {
                 input.value = '';
-                input.rows = 1;
+                if ('rows' in input) input.rows = 1;
                 input.blur();
               }
               container?.classList.remove('is-active');
@@ -1271,7 +1352,7 @@ export function initOmniAnnotations(getMarkdownValue) {
               const content = input ? input.value.trim() : '';
               if (content) {
                 input.value = '';
-                input.rows = 1;
+                if ('rows' in input) input.rows = 1;
                 collapsedReplies.delete(commentId);
                 applyLocalCommentAction({
                   type: 'addReply',
@@ -1306,27 +1387,27 @@ export function initOmniAnnotations(getMarkdownValue) {
       });
     });
 
-    zonesLayer.querySelectorAll('.omni-inline-reply-input').forEach(textarea => {
-      const commentId = textarea.getAttribute('data-comment-id');
+    zonesLayer.querySelectorAll('.omni-inline-reply-input').forEach(input => {
+      const commentId = input.getAttribute('data-comment-id');
       const container = commentId
         ? zonesLayer.querySelector(`[data-reply-container="${CSS.escape(commentId)}"]`)
         : null;
 
-      textarea.addEventListener('focus', () => {
+      input.addEventListener('focus', () => {
         container?.classList.add('is-active');
-        if (textarea.rows < 2) {
-          textarea.rows = 2;
+        if ('rows' in input && input.rows < 2) {
+          input.rows = 2;
         }
         syncZonePositions();
       });
 
-      textarea.addEventListener('input', () => {
+      input.addEventListener('input', () => {
         container?.classList.add('is-active');
         syncZonePositions();
       });
 
-      textarea.addEventListener('keydown', e => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           container?.querySelector('[data-action="submit-reply"]')?.click();
         } else if (e.key === 'Escape') {
@@ -1570,6 +1651,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       for (const [blockEl, count] of blockCounts.entries()) {
         blockEl.setAttribute('data-omni-comments', String(count));
       }
+      activeBlockCounts = blockCounts;
 
       if (window.CSS && CSS.highlights && window.Highlight) {
         if (normalHighlightRanges.length > 0) {
@@ -1589,9 +1671,12 @@ export function initOmniAnnotations(getMarkdownValue) {
           CSS.highlights.delete('omni-comment-focused');
         }
       }
-    } else if (window.CSS && CSS.highlights) {
-      CSS.highlights.delete('omni-comment');
-      CSS.highlights.delete('omni-comment-focused');
+    } else {
+      activeBlockCounts = new Map();
+      if (window.CSS && CSS.highlights) {
+        CSS.highlights.delete('omni-comment');
+        CSS.highlights.delete('omni-comment-focused');
+      }
     }
 
     renderInlineZones();
@@ -1618,7 +1703,11 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   document.addEventListener('click', e => {
-    if (zonesLayer.contains(e.target) || selectionChip.contains(e.target)) {
+    if (
+      zonesLayer.contains(e.target) ||
+      selectionChip.contains(e.target) ||
+      (gutterLayer && gutterLayer.contains(e.target))
+    ) {
       return;
     }
 

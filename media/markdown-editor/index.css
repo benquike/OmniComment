@@ -1488,41 +1488,110 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 
 [data-omni-comments],
 [data-markco-comments] {
-    position: relative;
+    position: relative !important;
 }
 
+/* Fallback CSS ::before pseudo-element comment indicator */
 [data-omni-comments]::before,
 [data-markco-comments]::before,
-.vditor-wysiwyg > .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]::before,
-.vditor-wysiwyg > .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]::before,
-.vditor-ir .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]::before,
-.vditor-ir .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]::before,
-.vditor-sv .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]::before,
-.vditor-sv .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]::before {
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-omni-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-markco-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-heading--active[data-omni-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-heading--active[data-markco-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > [data-omni-comments]::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > .vditor-block-handle-target[data-omni-comments]::before {
     content: "💬" !important;
     position: absolute !important;
-    left: -28px !important;
-    top: 4px !important;
+    left: -32px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
     font-size: 13px !important;
     line-height: 1 !important;
-    opacity: 0.85 !important;
-    cursor: pointer !important;
-    user-select: none !important;
-    z-index: 25 !important;
+    width: 22px !important;
+    height: 22px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    transition: transform 0.12s ease, opacity 0.12s ease !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    opacity: 0.85 !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    z-index: 100 !important;
+    border-radius: 4px !important;
+    background: var(--vscode-editorWidget-background, rgba(30, 30, 30, 0.8)) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+    transition: transform 0.12s ease, opacity 0.12s ease, background 0.12s ease !important;
 }
 
 [data-omni-comments]:hover::before,
 [data-markco-comments]:hover::before,
-.vditor-wysiwyg > .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]:hover::before,
-.vditor-wysiwyg > .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]:hover::before,
-.vditor-ir .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]:hover::before,
-.vditor-ir .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-markco-comments]:hover::before {
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6)[data-omni-comments]:hover::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > :is(h1, h2, h3, h4, h5, h6).vditor-block-handle-target[data-omni-comments]:hover::before,
+:is(.vditor-wysiwyg, .vditor-ir, .vditor-sv) .vditor-reset > [data-omni-comments]:hover::before {
     opacity: 1 !important;
-    transform: scale(1.15) !important;
+    visibility: visible !important;
+    transform: translateY(-50%) scale(1.15) !important;
+    background: var(--vscode-button-background, #0e639c) !important;
+}
+
+/* Dedicated Gutter Chip Layer (DOM-level bulletproof reliability across all modes) */
+.omni-gutter-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9500;
+    overflow: hidden;
+}
+
+.omni-gutter-chip {
+    position: fixed;
+    pointer-events: auto;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, rgba(128, 128, 128, 0.35));
+    background: var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328));
+    color: var(--front-color, #e3e3e3);
+    font-size: 13px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+    user-select: none;
+    padding: 0;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.omni-gutter-chip:hover {
+    transform: scale(1.18);
+    background: var(--vscode-button-background, #0e639c);
+    border-color: var(--vscode-focusBorder, #3794ff);
+    color: #ffffff;
+}
+
+.omni-gutter-chip.is-collapsed {
+    opacity: 0.92;
+    border-color: var(--vscode-textLink-foreground, #58a6ff);
+    box-shadow: 0 0 0 1px var(--vscode-textLink-foreground, #58a6ff), 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.omni-gutter-chip__badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 1px 3px;
+    border-radius: 6px;
+    background: var(--vscode-badge-background, #4d4d4d);
+    color: var(--vscode-badge-foreground, #ffffff);
+    pointer-events: none;
 }
 
 .omni-selection-chip {
@@ -1566,7 +1635,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     font-size: 12.5px;
     line-height: 1.45;
     color: var(--front-color, var(--vscode-editorWidget-foreground, #e3e3e3));
-    max-width: 540px;
+    max-width: 420px;
     width: 100%;
 }
 
@@ -1586,7 +1655,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 .omni-inline-zone__stack {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .omni-inline-thread {
@@ -1607,12 +1676,12 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 3px 10px;
+    gap: 6px;
+    padding: 3px 8px;
     min-height: 24px;
     box-sizing: border-box;
-    background: color-mix(in srgb, var(--front-color, #ffffff) 5%, var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328)));
-    border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.25));
+    background: color-mix(in srgb, var(--front-color, #ffffff) 6%, var(--vscode-editorWidget-background, var(--panel-background-color, #1f2328)));
+    border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.22));
     user-select: none;
 }
 
@@ -1627,11 +1696,55 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 .omni-inline-thread__header-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
     flex: 1;
     cursor: pointer;
     overflow: hidden;
+}
+
+.omni-inline-author {
+    font-weight: 600;
+    font-size: 11.5px;
+    color: var(--front-color, #e6edf3);
+    white-space: nowrap;
+}
+
+.omni-inline-sep {
+    opacity: 0.45;
+    font-size: 10px;
+}
+
+.omni-inline-time {
+    font-size: 10.5px;
+    opacity: 0.6;
+    white-space: nowrap;
+}
+
+.omni-inline-status-badge {
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.omni-inline-status-badge.is-resolved {
+    background: rgba(73, 179, 96, 0.2);
+    color: #49b360;
+}
+
+.omni-inline-anchor-pill {
+    font-size: 10.5px;
+    font-style: italic;
+    opacity: 0.65;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(127, 127, 127, 0.12);
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .omni-inline-thread__status {
@@ -1656,7 +1769,7 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     padding: 0 6px;
     border-radius: 3px;
     background: rgba(127, 127, 127, 0.14);
-    max-width: 220px;
+    max-width: 140px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1718,10 +1831,10 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
 }
 
 .omni-inline-thread__body {
-    padding: 8px 12px 10px;
+    padding: 6px 10px 8px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .omni-inline-item {
@@ -1823,22 +1936,35 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     margin-top: 2px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
-.omni-inline-reply-input,
+.omni-inline-reply-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 3px 8px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, rgba(160, 160, 160, 0.3));
+    background: color-mix(in srgb, #000000 12%, var(--vscode-editorWidget-background, var(--panel-background-color, #181a1f)));
+    color: var(--front-color, #e3e3e3);
+    font-family: inherit;
+    font-size: 11.5px;
+    outline: none;
+}
+
 .omni-inline-textarea,
 .omni-inline-anchor-input {
     width: 100%;
     box-sizing: border-box;
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 4px;
-    border: 1px solid var(--border-color, rgba(160, 160, 160, 0.4));
-    background: color-mix(in srgb, #000000 15%, var(--vscode-editorWidget-background, var(--panel-background-color, #181a1f)));
+    border: 1px solid var(--border-color, rgba(160, 160, 160, 0.35));
+    background: color-mix(in srgb, #000000 12%, var(--vscode-editorWidget-background, var(--panel-background-color, #181a1f)));
     color: var(--front-color, #e3e3e3);
     font-family: inherit;
-    font-size: 12.5px;
-    line-height: 1.4;
+    font-size: 12px;
+    line-height: 1.35;
     resize: vertical;
     outline: none;
 }
