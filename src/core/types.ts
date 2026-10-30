@@ -36,6 +36,11 @@ export interface Reply {
   createdAt: string;
   updatedAt?: string;
   thumbsUp?: string[];
+  /**
+   * Id of the item this reply answers: the root comment id or another reply id in the same
+   * thread. Absent for legacy replies and replies to the thread as a whole.
+   */
+  inReplyTo?: string;
 }
 
 export interface Comment {
@@ -108,7 +113,7 @@ export type SidebarMessage =
   | { type: 'resolveComment'; commentId: string }
   | { type: 'reAnchorComment'; commentId: string }
   | { type: 'editComment'; commentId: string; content: string }
-  | { type: 'addReply'; commentId: string; content: string }
+  | { type: 'addReply'; commentId: string; content: string; inReplyTo?: string }
   | { type: 'editReply'; commentId: string; replyId: string; content: string }
   | { type: 'deleteReply'; commentId: string; replyId: string }
   | { type: 'commentDeleted'; commentId: string }

@@ -17,7 +17,8 @@ import {
   getSelectionCodeLensProviderForTesting
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
-import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
+import { OmniCommentInlineItem, describeReplyTarget } from '../../providers/InlineCommentController';
+import { CommentSidebarProvider } from '../../providers/CommentSidebarProvider';
 import { resolveCommentBoxDimensions } from '../../core/types';
 
 const suite = Mocha.suite;
@@ -632,5 +633,74 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     assert.strictEqual(applied.length, 1);
     assert.strictEqual(applied[0].length, 1, 'Gutter selection decoration must still be applied');
     assert.strictEqual(applied[0][0].range.start.line, 1);
+  });
+
+  // Topology: comment c -> reply r1 (thread) -> reply r2 inReplyTo r1 -> native ↩ on root -> r3 inReplyTo c
+  // Expected: inReplyTo stored only for same-thread targets; quotes render; all three UIs wired.
+  test('Txt 15: Reply to a specific comment in the middle of a thread', async () => {
+    const filePath = path.join(tempDir, 'reply-to.txt');
+    fs.writeFileSync(filePath, 'header\nthe cache layer needs a lock\nfooter\n', 'utf-8');
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const editor = await vscode.window.showTextDocument(document);
+    editor.selection = new vscode.Selection(new vscode.Position(1, 4), new vscode.Position(1, 15));
+    await vscode.commands.executeCommand('omnicomment.addComment', { content: 'Root question' });
+
+    const service = getCommentServiceForTesting();
+    const root = service.getComments(document).find(c => c.content === 'Root question')!;
+    assert.ok(root, 'root comment created');
+    const r1 = await service.addReply(document, root.id, 'First answer');
+    const r2 = await service.addReply(document, root.id, 'Answering the first answer', r1!.id);
+    const bogus = await service.addReply(document, root.id, 'Dangling target', 'not-in-thread');
+    assert.strictEqual(r1!.inReplyTo, undefined, 'plain thread reply has no target');
+    assert.strictEqual(r2!.inReplyTo, r1!.id, 'reply to a middle item records its target');
+    assert.strictEqual(bogus!.inReplyTo, undefined, 'targets outside the thread are dropped');
+
+    // Persisted to the file and reloaded
+    service.clearCache(document);
+    const reloaded = service.getComments(document).find(c => c.id === root.id)!;
+    assert.strictEqual(reloaded.replies!.find(r => r.id === r2!.id)!.inReplyTo, r1!.id);
+
+    // Native thread: quote label + per-comment ↩ command
+    const label = describeReplyTarget(reloaded, reloaded.replies!.find(r => r.id === r2!.id)!);
+    assert.ok(label && label.includes('First answer'), `quote names the target, got ${label}`);
+    const item = new OmniCommentInlineItem(root.id, r2!.id, 'x', 'me', new Date().toISOString(),
+      undefined, undefined, undefined, label);
+    assert.ok(item.body.value.includes('Replying to'), 'reply body starts with the quote');
+
+    const rootItem = new OmniCommentInlineItem(root.id, undefined, root.content, root.author, root.createdAt);
+    const r3 = await vscode.commands.executeCommand<any>('omnicomment.inlineReplyToComment', rootItem, 'Back to the root');
+    assert.ok(r3, 'native ↩ command adds a reply');
+    assert.strictEqual(r3.inReplyTo, root.id, 'replying to the root records the root id');
+
+    // VS Code calls comment title actions as (comment, thread); a non-string 2nd arg must not throw
+    // (found with real clicks: `.trim()` on the thread object silently aborted the command).
+    const viaMenu = await vscode.commands.executeCommand('omnicomment.inlineReplyToComment', rootItem, {
+      uri: document.uri,
+      comments: []
+    });
+    assert.strictEqual(viaMenu, undefined, 'menu-style call opens the prompt (no preset text) instead of throwing');
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../package.json'), 'utf-8'));
+    assert.ok(
+      pkg.contributes.menus['comments/comment/title'].some(
+        (m: { command: string }) => m.command === 'omnicomment.inlineReplyToComment'
+      ),
+      '↩ button contributed on every native comment'
+    );
+
+    // Sidebar webview: generated script parses and has the per-reply reply button
+    const sidebarHtml: string = (new CommentSidebarProvider(vscode.Uri.file(path.join(__dirname, '../../..')), () => {}, () => {}, () => {}) as any)
+      ._getHtmlContent({ asWebviewUri: (u: vscode.Uri) => u, cspSource: '' });
+    const scripts = Array.from(sidebarHtml.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)).map(m => m[1]);
+    assert.ok(scripts.length > 0, 'sidebar has an inline script');
+    scripts.forEach(code => assert.doesNotThrow(() => new Function(code), 'sidebar script must parse'));
+    assert.ok(sidebarHtml.includes('btn-reply-to') && sidebarHtml.includes('inReplyTo: replyTargetId'));
+
+    // Markdown Editor webview: per-reply ↩, target chip, quote, and inReplyTo in the addReply action
+    const annotations = fs.readFileSync(path.join(__dirname, '../../../media/markdown-editor/omniAnnotations.js'), 'utf-8');
+    assert.doesNotThrow(() => new Function(annotations.replace(/^export\s+/gm, '')), 'omniAnnotations.js must parse');
+    for (const marker of ['data-reply-to=', 'clear-reply-target', 'omni-inline-reply-quote', 'inReplyTo']) {
+      assert.ok(annotations.includes(marker), `omniAnnotations.js must contain ${marker}`);
+    }
   });
 });

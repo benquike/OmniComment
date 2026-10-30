@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { Comment, CommentAnchor, Reply } from '../core/types';
+import { findReplyTarget } from '../core/replyThreading';
 import { AnchorEngine } from '../core/AnchorEngine';
 import { MarkdownStorageAdapter, OMNI_COMMENT_MARKER } from '../storage/MarkdownStorageAdapter';
 import { exec } from 'child_process';
@@ -299,7 +300,8 @@ export class CommentService {
   async addReply(
     document: vscode.TextDocument,
     commentId: string,
-    content: string
+    content: string,
+    inReplyTo?: string
   ): Promise<Reply | null> {
     const comments = this.getComments(document);
     const comment = comments.find(c => c.id === commentId);
@@ -316,6 +318,12 @@ export class CommentService {
       author,
       createdAt: new Date().toISOString()
     };
+    // Invariant: Only keep inReplyTo when it names an item of this same thread.
+    // Why: A dangling target would render a broken "replying to" quote.
+    // Example: inReplyTo of a reply in another thread -> stored as a plain thread reply.
+    if (findReplyTarget(comment, inReplyTo)) {
+      reply.inReplyTo = inReplyTo;
+    }
 
     if (!comment.replies) {
       comment.replies = [];

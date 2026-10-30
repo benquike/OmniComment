@@ -117,6 +117,25 @@ export function parseOmniComments(markdown) {
   }
 }
 
+// Invariant: Resolves an inReplyTo id to the root comment or a reply of the same thread.
+// Why: Mirrors src/core/replyThreading.ts so the webview and the extension agree on targets.
+// Example: findThreadItem(comment, 'r2') => { id: 'r2', author: 'bob', content: '...' }.
+function findThreadItem(comment, itemId) {
+  if (!comment || !itemId) return null;
+  if (itemId === comment.id) {
+    return { id: comment.id, author: comment.author, content: comment.content || '' };
+  }
+  const reply = (comment.replies || []).find(r => r.id === itemId);
+  return reply ? { id: reply.id, author: reply.author, content: reply.content || '' } : null;
+}
+
+// Invariant: One-line, length-capped preview of a message for quotes and chips.
+// Example: replySnippet('a\nb') => 'a b'.
+function replySnippet(content, maxLength = 60) {
+  const flat = String(content || '').replace(/\s+/g, ' ').trim();
+  return flat.length > maxLength ? flat.slice(0, maxLength - 1) + '…' : flat;
+}
+
 function serializeCommentsBlock(comments, marker = OMNI_COMMENT_BLOCK_START) {
   const sanitizedComments = comments.map(c => {
     const item = {
@@ -647,6 +666,8 @@ export function initOmniAnnotations(getMarkdownValue) {
   const collapsedReplies = new Set(); // commentIds whose responses list is collapsed
   let activeEditCommentId = null;
   let activeReplyCommentId = null;
+  // Id of the specific item (root comment or reply) the open composer answers; null = whole thread.
+  let activeReplyTargetId = null;
   let activeBlockCounts = new Map(); // blockEl -> number of active comments on this block
   let activeGutterTargets = new Map(); // gutterTargetEl (e.g. TR or blockEl) -> number of active comments
 
@@ -773,12 +794,19 @@ export function initOmniAnnotations(getMarkdownValue) {
         if (!Array.isArray(target.replies)) {
           target.replies = [];
         }
-        target.replies.push({
+        const newReply = {
           id: generateId(),
           content,
           author: cachedAuthor,
           createdAt: nowIso
-        });
+        };
+        // Invariant: inReplyTo is kept only when it names an item of this same thread.
+        // Why: A dangling target would render a broken "replying to" quote.
+        // Example: answering bob's reply r2 -> { ..., inReplyTo: 'r2' }.
+        if (findThreadItem(target, actionPayload.inReplyTo)) {
+          newReply.inReplyTo = actionPayload.inReplyTo;
+        }
+        target.replies.push(newReply);
         collapsedReplies.delete(target.id);
         break;
       }
@@ -1374,6 +1402,32 @@ export function initOmniAnnotations(getMarkdownValue) {
     `;
   }
 
+  // Invariant: A reply aimed at a specific earlier item shows a quote naming that item.
+  // Why: Replies stay in chronological order; the quote shows which message each one answers.
+  // Example: <div class="omni-inline-reply-quote">↪ @bob: “use a mutex here”</div>.
+  function renderReplyQuoteHtml(comment, inReplyTo) {
+    const target = findThreadItem(comment, inReplyTo);
+    if (!target) return '';
+    return `<div class="omni-inline-reply-quote" data-quote-target="${escapeHtml(target.id)}" title="${escapeHtml(
+      target.content
+    )}"><i class="codicon codicon-reply"></i><span class="omni-inline-reply-quote__author">@${escapeHtml(
+      target.author || 'User'
+    )}</span><span class="omni-inline-reply-quote__text">“${escapeHtml(replySnippet(target.content))}”</span></div>`;
+  }
+
+  // Invariant: The open composer names its target when replying to a specific item.
+  // Why: Users must see (and be able to clear) which message they are answering.
+  // Example: "Replying to @bob: “use a mutex…” ✕".
+  function renderReplyTargetChipHtml(comment) {
+    const target = findThreadItem(comment, activeReplyTargetId);
+    if (!target) return '';
+    return `<div class="omni-inline-reply-target"><i class="codicon codicon-reply"></i><span>Replying to <b>@${escapeHtml(
+      target.author || 'User'
+    )}</b>: “${escapeHtml(replySnippet(target.content, 50))}”</span><button type="button" class="omni-inline-item-btn" data-action="clear-reply-target" data-comment-id="${escapeHtml(
+      comment.id
+    )}" title="Reply to the whole thread instead"><i class="codicon codicon-close"></i></button></div>`;
+  }
+
   function renderThreadHtml(comment) {
     if (collapsedComments.has(comment.id)) {
       return '';
@@ -1512,6 +1566,11 @@ export function initOmniAnnotations(getMarkdownValue) {
                             formatCompactTime(r.createdAt)
                           )}</span>
                           <div class="omni-inline-item__actions">
+                            <button type="button" class="omni-inline-item-btn" data-action="open-reply" data-comment-id="${escapeHtml(
+                              comment.id
+                            )}" data-reply-to="${escapeHtml(r.id)}" title="Reply to ${escapeHtml(
+                              r.author || 'this response'
+                            )}"><i class="codicon codicon-reply"></i></button>
                             <button type="button" class="omni-inline-item-btn is-danger" data-action="delete-reply" data-comment-id="${escapeHtml(
                               comment.id
                             )}" data-reply-id="${escapeHtml(
@@ -1519,6 +1578,7 @@ export function initOmniAnnotations(getMarkdownValue) {
                             )}" title="Delete response"><i class="codicon codicon-trash"></i></button>
                           </div>
                         </div>
+                        ${renderReplyQuoteHtml(comment, r.inReplyTo)}
                         <div class="omni-inline-item__text">${
                           commentBoxConfig.enableMarkdown
                             ? renderCommentMarkdown(r.content)
@@ -1543,6 +1603,7 @@ export function initOmniAnnotations(getMarkdownValue) {
               <div class="omni-inline-reply-container is-active" data-reply-container="${escapeHtml(
                 comment.id
               )}">
+                ${renderReplyTargetChipHtml(comment)}
                 <textarea
                   id="omni-reply-input-${escapeHtml(comment.id)}"
                   class="omni-inline-textarea omni-inline-reply-input"
@@ -1730,6 +1791,7 @@ export function initOmniAnnotations(getMarkdownValue) {
           case 'open-reply':
             if (commentId) {
               activeReplyCommentId = commentId;
+              activeReplyTargetId = el.getAttribute('data-reply-to') || null;
               renderInlineZones();
               setTimeout(() => {
                 const input = zonesLayer.querySelector(
@@ -1739,8 +1801,13 @@ export function initOmniAnnotations(getMarkdownValue) {
               }, 20);
             }
             break;
+          case 'clear-reply-target':
+            activeReplyTargetId = null;
+            renderInlineZones();
+            break;
           case 'cancel-reply':
             activeReplyCommentId = null;
+            activeReplyTargetId = null;
             renderInlineZones();
             break;
           case 'submit-reply':
@@ -1750,12 +1817,15 @@ export function initOmniAnnotations(getMarkdownValue) {
               );
               const content = input ? input.value.trim() : '';
               if (content) {
+                const inReplyTo = activeReplyTargetId || undefined;
                 activeReplyCommentId = null;
+                activeReplyTargetId = null;
                 collapsedReplies.delete(commentId);
                 applyLocalCommentAction({
                   type: 'addReply',
                   commentId,
-                  content
+                  content,
+                  inReplyTo
                 });
               }
             }

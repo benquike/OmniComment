@@ -643,3 +643,23 @@ kbd {
   font-weight: 600;
   min-width: 14px;
 }
+
+/* Reply to a specific message: quote above a reply and target chip in the reply form */
+.reply-quote {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+  padding: 1px 6px;
+  border-left: 2px solid var(--vscode-textLink-foreground);
+  background: var(--vscode-textBlockQuote-background);
+  font-size: 11px;
+  opacity: 0.85;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.reply-quote.reply-target .btn-icon {
+  margin-left: auto;
+}

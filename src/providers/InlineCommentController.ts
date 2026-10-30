@@ -1,6 +1,19 @@
 import * as vscode from 'vscode';
 import { Comment, Reply, isSupportedCommentDocument } from '../types';
 import { MarkdownStorageAdapter } from '../storage/MarkdownStorageAdapter';
+import { findReplyTarget, formatReplySnippet } from '../core/replyThreading';
+
+// Invariant: Builds the "Replying to @author: “snippet”" label for a reply, or undefined.
+// Why: Only replies aimed at a specific item get a quote; plain thread replies stay unchanged.
+// Example: reply.inReplyTo = 'r1' (bob: "use a mutex") => 'Replying to **@bob**: “use a mutex”'.
+export function describeReplyTarget(comment: Comment, reply: Reply): string | undefined {
+  const target = findReplyTarget(comment, reply.inReplyTo);
+  if (!target) {
+    return undefined;
+  }
+  const snippet = formatReplySnippet(target.content).replace(/[*_`[\]]/g, '\\$&');
+  return `Replying to **@${target.author}**: “${snippet}”`;
+}
 
 export class OmniCommentInlineItem implements vscode.Comment {
   public body: vscode.MarkdownString;
@@ -17,13 +30,20 @@ export class OmniCommentInlineItem implements vscode.Comment {
     createdAt: string,
     anchorText?: string,
     lineLabel?: string,
-    resolved?: boolean
+    resolved?: boolean,
+    replyTargetLabel?: string
   ) {
     const md = new vscode.MarkdownString('', true);
     md.isTrusted = true;
     if (!replyId && anchorText) {
       const escapedQuote = anchorText.replace(/\r?\n/g, ' ');
       md.appendMarkdown(`> **${lineLabel || 'Target'}:** \`${escapedQuote}\`\n\n`);
+    }
+    // Invariant: A reply to a specific earlier item starts with a quote naming that item.
+    // Why: The native thread is a flat list; the quote shows which message is being answered.
+    // Example: "> ↪ Replying to **@bob**: “use a mutex here”".
+    if (replyId && replyTargetLabel) {
+      md.appendMarkdown(`> ↪ ${replyTargetLabel}\n\n`);
     }
     // Invariant: Render comment content with rich markdown when enableMarkdown is true, or plain text when false.
     // Why: Allows users to configure whether inline comment boxes format markdown or preserve raw text.
@@ -169,7 +189,11 @@ export class InlineCommentController implements vscode.Disposable {
               r.id,
               r.content,
               r.author,
-              r.createdAt
+              r.createdAt,
+              undefined,
+              undefined,
+              undefined,
+              describeReplyTarget(comment, r)
             )
         )
       ];
@@ -214,6 +238,18 @@ export class InlineCommentController implements vscode.Disposable {
 
   public getCommentIdForThread(thread: vscode.CommentThread): string | undefined {
     return this._commentIdByThread.get(thread);
+  }
+
+  // Invariant: Maps a comment id back to the document it was last synced from.
+  // Why: Per-comment actions (e.g. "Reply to this") receive only the vscode.Comment, not its URI.
+  // Example: findDocumentForComment('c1') => TextDocument(notes.txt).
+  public findDocumentForComment(commentId: string): vscode.TextDocument | undefined {
+    for (const { doc, comments } of this._lastDocComments.values()) {
+      if (comments.some(c => c.id === commentId)) {
+        return doc;
+      }
+    }
+    return undefined;
   }
 
   public focusCommentThread(documentUri: vscode.Uri, commentId: string): void {

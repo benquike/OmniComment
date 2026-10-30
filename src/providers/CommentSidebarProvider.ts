@@ -32,7 +32,11 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     private readonly _onDelete: (commentId: string) => void | Promise<void>,
     private readonly _onEdit: (commentId: string, content: string) => void | Promise<void>,
     private readonly _onReady?: () => void | Promise<void>,
-    private readonly _onAddReply?: (commentId: string, content: string) => void | Promise<void>,
+    private readonly _onAddReply?: (
+      commentId: string,
+      content: string,
+      inReplyTo?: string
+    ) => void | Promise<void>,
     private readonly _onEditReply?: (commentId: string, replyId: string, content: string) => void | Promise<void>,
     private readonly _onDeleteReply?: (commentId: string, replyId: string) => void | Promise<void>,
     private readonly _onResolve?: (commentId: string) => void | Promise<void>,
@@ -77,7 +81,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
           break;
         case 'addReply':
           if (this._onAddReply) {
-            this._onAddReply(message.commentId, message.content);
+            this._onAddReply(message.commentId, message.content, message.inReplyTo);
           }
           break;
         case 'editReply':
@@ -360,6 +364,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     let editingCommentId = null;
     let editingReplyId = null;
     let replyingToCommentId = null;
+    let replyTargetId = null;
     let showResolved = true;
     let currentUser = null;
     let commentBoxConfig = {
@@ -497,7 +502,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
             </div>
           \` : ''}
           \${renderReplies(comment)}
-          \${replyingToCommentId === comment.id ? renderReplyForm(comment.id) : ''}
+          \${replyingToCommentId === comment.id ? renderReplyForm(comment) : ''}
         </div>
       \`).join('');
       
@@ -522,9 +527,11 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       \`;
     }
 
-    function renderReplyForm(commentId) {
+    function renderReplyForm(comment) {
+      const commentId = comment.id;
       return \`
         <div class="inline-form reply-form" onclick="event.stopPropagation()">
+          \${renderReplyTargetChip(comment)}
           <textarea class="reply-input" id="reply-input-\${commentId}" placeholder="Type your reply..." rows="2"></textarea>
           <div class="inline-form-actions">
             <button class="btn-secondary btn-sm" onclick="cancelReply()">Cancel</button>
@@ -591,15 +598,50 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       }
     }
 
-    function startReply(commentId) {
+    // Invariant: targetId names the reply being answered; omitted = reply to the thread.
+    // Example: startReply('c1', 'r2') -> composer shows "Replying to @bob".
+    function startReply(commentId, targetId) {
       replyingToCommentId = commentId;
+      replyTargetId = targetId || null;
       editingCommentId = null;
       editingReplyId = null;
       renderComments();
     }
 
+    function clearReplyTarget() {
+      replyTargetId = null;
+      renderComments();
+    }
+
+    // Invariant: Mirrors src/core/replyThreading.ts findReplyTarget for the sidebar webview.
+    function findThreadItem(comment, itemId) {
+      if (!comment || !itemId) return null;
+      if (itemId === comment.id) return { id: comment.id, author: comment.author, content: comment.content || '' };
+      const reply = (comment.replies || []).find(r => r.id === itemId);
+      return reply ? { id: reply.id, author: reply.author, content: reply.content || '' } : null;
+    }
+
+    function replySnippet(content, maxLength) {
+      const limit = maxLength || 60;
+      const flat = String(content || '').replace(/\\s+/g, ' ').trim();
+      return flat.length > limit ? flat.slice(0, limit - 1) + '…' : flat;
+    }
+
+    function renderReplyQuote(comment, inReplyTo) {
+      const target = findThreadItem(comment, inReplyTo);
+      if (!target) return '';
+      return \`<div class="reply-quote" title="\${escapeHtml(target.content)}"><i class="codicon codicon-reply"></i> <b>@\${escapeHtml(target.author)}</b>: “\${escapeHtml(replySnippet(target.content))}”</div>\`;
+    }
+
+    function renderReplyTargetChip(comment) {
+      const target = findThreadItem(comment, replyTargetId);
+      if (!target) return '';
+      return \`<div class="reply-quote reply-target"><i class="codicon codicon-reply"></i> Replying to <b>@\${escapeHtml(target.author)}</b>: “\${escapeHtml(replySnippet(target.content, 50))}” <button class="btn-icon" onclick="clearReplyTarget()" title="Reply to the whole thread instead"><i class="codicon codicon-close"></i></button></div>\`;
+    }
+
     function cancelReply() {
       replyingToCommentId = null;
+      replyTargetId = null;
       renderComments();
     }
 
@@ -607,8 +649,9 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
       const input = document.getElementById('reply-input-' + commentId);
       const content = input.value.trim();
       if (content) {
-        vscode.postMessage({ type: 'addReply', commentId: commentId, content: content });
+        vscode.postMessage({ type: 'addReply', commentId: commentId, content: content, inReplyTo: replyTargetId || undefined });
         replyingToCommentId = null;
+        replyTargetId = null;
       }
     }
 
@@ -653,8 +696,10 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
                 <span class="reply-date">\${formatDate(reply.createdAt)}</span>
               </div>
               \${editingReplyId && editingReplyId.replyId === reply.id ? renderEditReplyForm(comment.id, reply) : \`
+                \${renderReplyQuote(comment, reply.inReplyTo)}
                 <div class="reply-content">\${renderCommentMarkdown(reply.content)}</div>
                 <div class="reply-actions">
+                  <button class="btn-icon btn-reply-to" onclick="startReply('\${comment.id}', '\${reply.id}')" title="Reply to this response"><i class="codicon codicon-reply"></i></button>
                   \${currentUser && reply.author === currentUser ? \`<button class="btn-icon btn-edit-reply" onclick="startEditReply('\${comment.id}', '\${reply.id}')" title="Edit"><i class="codicon codicon-edit"></i></button>\` : ''}
                   <button class="btn-icon btn-thumbsup \${reply.thumbsUp && reply.thumbsUp.includes(currentUser) ? 'active' : ''}" onclick="toggleThumbsUpReply('\${comment.id}', '\${reply.id}')" title="\${reply.thumbsUp && reply.thumbsUp.length ? reply.thumbsUp.join(', ') : 'No reactions'}"><i class="codicon codicon-thumbsup"></i>\${reply.thumbsUp && reply.thumbsUp.length > 1 ? \`<span class="thumbsup-count">\${reply.thumbsUp.length}</span>\` : ''}</button>
                   <button class="btn-icon btn-delete-reply" onclick="deleteReply('\${comment.id}', '\${reply.id}')" title="Delete"><i class="codicon codicon-trash"></i></button>
@@ -686,7 +731,7 @@ export class CommentSidebarProvider implements vscode.WebviewViewProvider {
     function renderCommentMarkdown(text) {
       if (!text || typeof text !== 'string') return '';
       if (commentBoxConfig && !commentBoxConfig.enableMarkdown) {
-        return escapeHtml(text).replace(/\n/g, '<br>');
+        return escapeHtml(text).replace(/\\n/g, '<br>');
       }
       var escaped = escapeHtml(text);
       var codeBlocks = [];

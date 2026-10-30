@@ -12,6 +12,7 @@ import {
 import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
 import { SelectionCodeLensProvider } from './providers/SelectionCodeLensProvider';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
+import { findReplyTarget, formatReplySnippet } from './core/replyThreading';
 import {
   CommentBoxConfig,
   CommentBoxWidthMode,
@@ -19,7 +20,8 @@ import {
   resolveCommentBoxDimensions,
   isSupportedCommentDocument,
   isSupportedCommentLanguage,
-  isSupportedCommentUri
+  isSupportedCommentUri,
+  Reply
 } from './core/types';
 
 let commentService: CommentService;
@@ -452,13 +454,13 @@ export function activate(context: vscode.ExtensionContext) {
       }
     },
     // Add reply callback - receives content directly from sidebar
-    async (commentId: string, content: string) => {
+    async (commentId: string, content: string, inReplyTo?: string) => {
       const ctx = await getActiveMarkdownContext();
       if (!ctx) {
         return;
       }
 
-      const reply = await commentService.addReply(ctx.document, commentId, content);
+      const reply = await commentService.addReply(ctx.document, commentId, content, inReplyTo);
       if (reply) {
         await saveDocumentIfCustomEditor(ctx);
         await refreshForContext(ctx.document, ctx.editor);
@@ -804,6 +806,7 @@ export function activate(context: vscode.ExtensionContext) {
       commentId?: string;
       replyId?: string;
       content?: string;
+      inReplyTo?: string;
       uri?: vscode.Uri;
       state?: unknown;
     }) => {
@@ -862,7 +865,8 @@ export function activate(context: vscode.ExtensionContext) {
             await commentService.addReply(
               ctx.document,
               payload.commentId,
-              payload.content.trim()
+              payload.content.trim(),
+              payload.inReplyTo
             );
             await saveDocumentIfCustomEditor(ctx);
             await refreshForContext(ctx.document, ctx.editor);
@@ -1016,6 +1020,19 @@ export function activate(context: vscode.ExtensionContext) {
         await refreshForContext(ctx.document, ctx.editor);
       }
     ),
+    vscode.commands.registerCommand(
+      'omnicomment.inlineReplyToComment',
+      // VS Code invokes comment title actions as (comment, thread); only a string 2nd arg is preset text.
+      async (item: OmniCommentInlineItem, second?: unknown) => {
+        try {
+          return await replyToCommentItem(item, typeof second === 'string' ? second : undefined);
+        } catch (err) {
+          writeDebugLog(`replyToCommentItem failed: ${err instanceof Error ? err.stack : String(err)}`);
+          vscode.window.showErrorMessage(`OmniComment: could not add reply (${String(err)})`);
+          return undefined;
+        }
+      }
+    ),
     vscode.commands.registerCommand('omnicomment.toggleCollapseAllComments', async () => {
       const ctx = await getActiveMarkdownContext();
       if (ctx) {
@@ -1096,12 +1113,18 @@ export function activate(context: vscode.ExtensionContext) {
     commentId: string;
     content: string;
     author?: string;
+    inReplyTo?: string;
   }) => {
     const ctx = await resolveDocumentContext(args?.uri);
     if (!ctx || !args?.commentId || !args?.content) {
       return null;
     }
-    const reply = await commentService.addReply(ctx.document, args.commentId, args.content);
+    const reply = await commentService.addReply(
+      ctx.document,
+      args.commentId,
+      args.content,
+      args.inReplyTo
+    );
     if (reply && args.author) {
       reply.author = args.author;
       const comments = commentService.getComments(ctx.document);
@@ -1697,6 +1720,50 @@ function writeDebugLog(message: string): void {
   } catch {
     // Debug logging must never break the extension
   }
+}
+
+// Invariant: Replies to one specific item (root or reply) of a native comment thread.
+// Why: The thread's own reply box always appends to the end; this action records which
+//      earlier message the reply answers (Reply.inReplyTo).
+// Example: click ↩ on bob's reply "use a mutex" -> prompt "Reply to @bob" -> reply.inReplyTo = bob's id.
+export async function replyToCommentItem(
+  item: OmniCommentInlineItem | undefined,
+  presetContent?: string
+): Promise<Reply | undefined> {
+  if (!item) {
+    return undefined;
+  }
+  const knownDoc = inlineCommentController.findDocumentForComment(item.commentId);
+  if (!knownDoc) {
+    return undefined;
+  }
+  const document = await vscode.workspace.openTextDocument(knownDoc.uri);
+  const comment = commentService.findComment(document, item.commentId);
+  const targetId = item.replyId ?? item.commentId;
+  const target = comment ? findReplyTarget(comment, targetId) : undefined;
+  if (!target) {
+    return undefined;
+  }
+  const content =
+    presetContent?.trim() ||
+    (isTestMode
+      ? undefined
+      : (
+          await vscode.window.showInputBox({
+            prompt: `Reply to @${target.author}: “${formatReplySnippet(target.content, 50)}”`,
+            placeHolder: 'Type your reply and press Enter...'
+          })
+        )?.trim());
+  if (!content) {
+    return undefined;
+  }
+  const reply = await commentService.addReply(document, item.commentId, content, targetId);
+  const editor = vscode.window.visibleTextEditors.find(
+    e => e.document.uri.toString() === document.uri.toString()
+  );
+  await saveDocumentIfCustomEditor({ document, editor });
+  await refreshForContext(document, editor);
+  return reply ?? undefined;
 }
 
 export interface ParsedAddCommentOptions {
