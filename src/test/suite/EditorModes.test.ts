@@ -382,6 +382,106 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     }
   });
 
+  // Topology: Markdown with table -> open in cweijan.markdownViewer -> add comment in table cell -> collapse -> verify gutter chip
+  // Expected: Comment placed in table cell, when collapsed, displays .omni-gutter-chip with 💬 bubble icon.
+  test('Mode 4B: Table cell comment displays gutter bubble icon when collapsed', async () => {
+    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
+    if (!officeExt) {
+      return;
+    }
+
+    const filePath = path.join(tempDir, 'mode4-table.md');
+    fs.writeFileSync(
+      filePath,
+      '# Table Testing Document\n\n| Column A | Column B |\n| --- | --- |\n| Header Row | Header Data |\n| Cell Row 2 | Data 2 |\n| Target Cell | Target Data |\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+
+    await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
+    await waitForCondition(() => {
+      const activeTab = vscode.window.tabGroups?.activeTabGroup?.activeTab;
+      return Boolean(activeTab && activeTab.input && 'viewType' in (activeTab.input as object));
+    });
+
+    const ctx = await getActiveMarkdownContext(fileUri);
+    assert.ok(ctx);
+
+    const tableCommentText = 'Reviewing target table cell';
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: 'Target Cell',
+      content: tableCommentText
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 1;
+    });
+
+    // Query state while expanded
+    let expandedState: any = null;
+    await waitForCondition(async () => {
+      expandedState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(expandedState && expandedState.threadCount === 1);
+    }, 10000);
+    console.log('EXPANDED STATE:', JSON.stringify(expandedState, null, 2));
+
+    // Collapse via header chevron
+    let collapsedState: any = null;
+    await waitForCondition(async () => {
+      collapsedState = await queryMarkdownEditorInlineStateForTesting(
+        '.omni-collapse-chevron',
+        800
+      );
+      return Boolean(collapsedState && collapsedState.threads?.[0]?.isCollapsed);
+    }, 10000);
+    assert.ok(collapsedState, 'Collapsed inline state must be retrieved');
+    assert.ok(collapsedState.gutterChipCount >= 1, 'Gutter chip must be present when collapsed');
+    assert.strictEqual(
+      collapsedState.gutterChips[0].isCollapsed,
+      true,
+      'Gutter chip must have is-collapsed class'
+    );
+    assert.ok(
+      collapsedState.gutterChips[0].text.includes('💬'),
+      'Gutter chip must display comment bubble icon'
+    );
+
+    // Invariant: Gutter chip must be aligned with the table row (~260px) rather than table top header (~148px)
+    const chipTop = parseFloat(collapsedState.gutterChips[0].top);
+    assert.ok(
+      chipTop > 200,
+      `Gutter chip top (${chipTop}px) must align with table row 3 (>200px), not table top (~148px)`
+    );
+
+    // Invariant: Adding a second comment in a different table row creates an independent gutter target
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: 'Cell Row 2',
+      content: 'Second comment in Row 2'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 2;
+    });
+
+    let multiRowState: any = null;
+    await waitForCondition(async () => {
+      multiRowState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(multiRowState && multiRowState.gutterChipCount === 2);
+    }, 10000);
+    assert.ok(multiRowState, 'Multi-row state must be retrieved');
+    assert.strictEqual(multiRowState.gutterChipCount, 2, 'Must have 2 distinct gutter chips for 2 table rows');
+    assert.strictEqual(multiRowState.activeGutterTargetsSize, 2, 'Must track 2 distinct TR targets');
+    const chipTops = multiRowState.gutterChips.map((c: any) => parseFloat(c.top));
+    assert.notStrictEqual(chipTops[0], chipTops[1], 'Gutter chips on different table rows must have distinct vertical tops');
+  });
+
   // Topology: .txt file -> openTextDocument -> omnicomment.editorCommentAction -> parseComments
   // Expected: .txt document resolves in getActiveMarkdownContext, comment persists in comment block, inline thread created.
   test('Mode 1E: Plain text (.txt) document support in standard text editor', async () => {

@@ -1850,6 +1850,22 @@ export async function queryMarkdownEditorInlineStateForTesting(
   threadCount: number;
   visibleThreadCount?: number;
   highlightCount?: number;
+  gutterChipCount?: number;
+  gutterChips?: Array<{
+    top: string;
+    left: string;
+    className: string;
+    isCollapsed: boolean;
+    text: string;
+  }>;
+  activeBlockCountsSize?: number;
+  activeBlocks?: any[];
+  activeGutterTargetsSize?: number;
+  activeGutterTargets?: any[];
+  viewportRect?: any;
+  commentRangesCount?: number;
+  commentRangesDetails?: any[];
+  commentRangesBlocks?: string[];
   threads: Array<{
     commentId: string;
     isCollapsed: boolean;

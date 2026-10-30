@@ -403,6 +403,35 @@ function resolveBlockElement(node, contentRoot) {
   return null;
 }
 
+// Invariant: Resolves the closest semantic text boundary (including table cells) for DOM text walker tokenization.
+// Why: Prevents adjacent table cell text from concatenating without word boundaries during anchor search.
+// Example: text node in <td>Col 1</td> resolves to <td> rather than the enclosing <table>.
+function resolveTextBoundaryElement(node, contentRoot) {
+  const el = node instanceof Element ? node : node?.parentElement;
+  if (!el || !contentRoot || !contentRoot.contains(el)) return null;
+  const cellEl = el.closest('td, th');
+  if (cellEl && isEligibleBlock(cellEl.closest('table'), contentRoot)) {
+    return cellEl;
+  }
+  return resolveBlockElement(node, contentRoot);
+}
+
+// Invariant: Resolves the precise row or block element for gutter bubble icon positioning.
+// Why: Comments in table cells must align with their specific <tr> row rather than the table top header.
+// Example: comment on text in row 3 targets that row's <tr> element for its gutter chip.
+function resolveGutterTargetElement(range, blockEl) {
+  if (range && range.startContainer) {
+    const parent = range.startContainer instanceof Element
+      ? range.startContainer
+      : range.startContainer.parentElement;
+    const trEl = parent?.closest('tr');
+    if (trEl && blockEl && blockEl.contains(trEl)) {
+      return trEl;
+    }
+  }
+  return blockEl;
+}
+
 // Invariant: Fallback block must be a real visible content block with positive height.
 // Why: Missing anchor matches must attach to first real block, never zero-height boundary spans.
 // Example: Returns <h1>Fixed Offset...</h1> instead of <span class="vditor-editor-boundary">.
@@ -463,10 +492,10 @@ function buildDomTextMap(container) {
         lastWasSpace = false;
       }
     }
-    const parentBlock = resolveBlockElement(currentNode, container);
+    const parentBlock = resolveTextBoundaryElement(currentNode, container);
     const nextNode = walker.nextNode();
     if (nextNode) {
-      const nextBlock = resolveBlockElement(nextNode, container);
+      const nextBlock = resolveTextBoundaryElement(nextNode, container);
       if (parentBlock !== nextBlock && !lastWasSpace && positions.length > 0) {
         chars.push(' ');
         positions.push(positions[positions.length - 1]);
@@ -596,6 +625,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   let activeEditCommentId = null;
   let activeReplyCommentId = null;
   let activeBlockCounts = new Map(); // blockEl -> number of active comments on this block
+  let activeGutterTargets = new Map(); // gutterTargetEl (e.g. TR or blockEl) -> number of active comments
 
   // Configurable comment box state
   let commentBoxConfig = {
@@ -967,8 +997,10 @@ export function initOmniAnnotations(getMarkdownValue) {
     }
     if (selection.anchorNode && contentRoot.contains(selection.anchorNode)) {
       const blockEl = resolveBlockElement(selection.anchorNode, contentRoot);
+      const boundaryEl = resolveTextBoundaryElement(selection.anchorNode, contentRoot);
+      const textEl = boundaryEl || blockEl;
       if (blockEl && !blockEl.classList.contains('omni-storage-block')) {
-        const text = (blockEl.textContent || '')
+        const text = (textEl.textContent || '')
           .replace(/[\u200B-\u200D\uFEFF]/g, '')
           .replace(/\u00A0/g, ' ')
           .trim();
@@ -1047,6 +1079,59 @@ export function initOmniAnnotations(getMarkdownValue) {
     const minAllowedLeft = Math.max(4, Math.round(viewportLeft + 4));
     const desiredLeft = Math.round(blockLeft - 30);
     return Math.max(minAllowedLeft, desiredLeft);
+  }
+
+  // Invariant: Calculates vertical pixel placement for gutter chip aligned to block or table row.
+  // Why: Table rows require row-centered alignment, while standard paragraph blocks align near top edge.
+  // Example: calculateGutterChipTop(trElement, { top: 254, height: 28 }) => 257
+  function calculateGutterChipTop(targetEl, bRect) {
+    if (targetEl.tagName === 'TR') {
+      return Math.round(bRect.top + Math.max(0, (bRect.height - 22) / 2));
+    }
+    return Math.round(
+      bRect.top + (bRect.height > 32 ? 6 : Math.max(0, (bRect.height - 22) / 2))
+    );
+  }
+
+  // Invariant: Resolves the horizontal anchor element to measure left gutter offset for a comment target.
+  // Why: Table rows inherit their left margin from the enclosing table element rather than arbitrary cell boundaries.
+  // Example: resolveGutterAnchorBlock(trElement) => tableElement
+  function resolveGutterAnchorBlock(targetEl) {
+    if (targetEl.tagName === 'TR') {
+      return targetEl.closest('table') || targetEl;
+    }
+    return targetEl;
+  }
+
+  // Invariant: Returns true if every active comment associated with the given target element is collapsed.
+  // Why: Determines whether the gutter bubble chip should display the collapsed styling (.is-collapsed).
+  // Example: isCommentCollapsedOnTarget(trEl, [{ comment: { id: 'c1' } }]) => true
+  function isCommentCollapsedOnTarget(targetEl, items) {
+    const targetItems = items.filter(
+      i => i.gutterTargetEl === targetEl || (!i.gutterTargetEl && i.blockEl === targetEl)
+    );
+    if (targetItems.length === 0) return false;
+    return targetItems.every(i => collapsedComments.has(i.comment.id));
+  }
+
+  // Invariant: Toggles the collapsed state for all comments associated with the target element.
+  // Why: Enables clicking a row's gutter bubble icon to expand or collapse that specific row's comments.
+  // Example: toggleCommentsForTarget(trEl, commentRanges) => flips collapsed state of row comments
+  function toggleCommentsForTarget(targetEl, items) {
+    const targetItems = items.filter(
+      i => i.gutterTargetEl === targetEl || (!i.gutterTargetEl && i.blockEl === targetEl)
+    );
+    if (targetItems.length === 0) return;
+    const allCollapsed = targetItems.every(i => collapsedComments.has(i.comment.id));
+    for (const item of targetItems) {
+      if (allCollapsed) {
+        collapsedComments.delete(item.comment.id);
+        focusedCommentId = item.comment.id;
+      } else {
+        collapsedComments.add(item.comment.id);
+      }
+    }
+    renderInlineZones();
   }
 
   function syncZonePositions() {
@@ -1145,22 +1230,19 @@ export function initOmniAnnotations(getMarkdownValue) {
       }
     }
 
-    // Render interactive DOM gutter chips for all blocks with comments
+    // Render interactive DOM gutter chips for all blocks or table rows with comments
     if (gutterLayer) {
       gutterLayer.replaceChildren();
-      for (const [blockEl, count] of activeBlockCounts.entries()) {
-        if (!blockEl || !blockEl.isConnected || !contentRoot.contains(blockEl)) {
+      for (const [targetEl, count] of activeGutterTargets.entries()) {
+        if (!targetEl || !targetEl.isConnected || !contentRoot.contains(targetEl)) {
           continue;
         }
-        const bRect = blockEl.getBoundingClientRect();
+        const bRect = targetEl.getBoundingClientRect();
         if (!isBlockVisibleInViewport(bRect, clipTop, clipBottom)) {
           continue;
         }
 
-        const blockItems = commentRanges.filter(i => i.blockEl === blockEl);
-        const isCollapsed =
-          blockItems.length > 0 &&
-          blockItems.every(i => collapsedComments.has(i.comment.id));
+        const isCollapsed = isCommentCollapsedOnTarget(targetEl, commentRanges);
 
         const chip = document.createElement('button');
         chip.type = 'button';
@@ -1173,10 +1255,12 @@ export function initOmniAnnotations(getMarkdownValue) {
           count === 1 ? 'comment' : 'comments'
         }`;
 
-        const chipTop = Math.round(
-          bRect.top + (bRect.height > 32 ? 6 : Math.max(0, (bRect.height - 22) / 2))
+        const chipTop = calculateGutterChipTop(targetEl, bRect);
+        const anchorBlock = resolveGutterAnchorBlock(targetEl);
+        const chipLeft = calculateGutterChipLeft(
+          anchorBlock.getBoundingClientRect().left,
+          viewportRect.left
         );
-        const chipLeft = calculateGutterChipLeft(bRect.left, viewportRect.left);
 
         chip.style.top = `${chipTop}px`;
         chip.style.left = `${chipLeft}px`;
@@ -1188,19 +1272,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         chip.addEventListener('click', e => {
           e.stopPropagation();
           e.preventDefault();
-          const items = commentRanges.filter(i => i.blockEl === blockEl);
-          if (items.length > 0) {
-            const allCol = items.every(i => collapsedComments.has(i.comment.id));
-            for (const item of items) {
-              if (allCol) {
-                collapsedComments.delete(item.comment.id);
-                focusedCommentId = item.comment.id;
-              } else {
-                collapsedComments.add(item.comment.id);
-              }
-            }
-            renderInlineZones();
-          }
+          toggleCommentsForTarget(targetEl, commentRanges);
         });
 
         gutterLayer.appendChild(chip);
@@ -1918,6 +1990,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       const normalHighlightRanges = [];
       const focusedHighlightRanges = [];
       const blockCounts = new Map();
+      const gutterTargetsMap = new Map();
 
       for (const comment of activeComments) {
         const searchNorm = stripMarkdownSyntax(comment.anchor?.text || '');
@@ -1943,7 +2016,8 @@ export function initOmniAnnotations(getMarkdownValue) {
 
               const blockEl =
                 resolveBlockElement(startPos.node, contentRoot) || fallbackBlock;
-              commentRanges.push({ comment, range, blockEl });
+              const gutterTargetEl = resolveGutterTargetElement(range, blockEl);
+              commentRanges.push({ comment, range, blockEl, gutterTargetEl });
 
               // Only highlight text for unresolved comments; when resolved, clear highlight
               if (!comment.resolved) {
@@ -1956,6 +2030,12 @@ export function initOmniAnnotations(getMarkdownValue) {
                 if (blockEl) {
                   blockCounts.set(blockEl, (blockCounts.get(blockEl) || 0) + 1);
                 }
+                if (gutterTargetEl) {
+                  gutterTargetsMap.set(
+                    gutterTargetEl,
+                    (gutterTargetsMap.get(gutterTargetEl) || 0) + 1
+                  );
+                }
               }
               continue;
             } catch {
@@ -1965,18 +2045,34 @@ export function initOmniAnnotations(getMarkdownValue) {
         }
 
         if (fallbackBlock) {
-          commentRanges.push({ comment, range: null, blockEl: fallbackBlock });
-          blockCounts.set(
-            fallbackBlock,
-            (blockCounts.get(fallbackBlock) || 0) + 1
-          );
+          const gutterTargetEl = resolveGutterTargetElement(null, fallbackBlock);
+          commentRanges.push({
+            comment,
+            range: null,
+            blockEl: fallbackBlock,
+            gutterTargetEl
+          });
+          if (!comment.resolved) {
+            blockCounts.set(
+              fallbackBlock,
+              (blockCounts.get(fallbackBlock) || 0) + 1
+            );
+            gutterTargetsMap.set(
+              gutterTargetEl,
+              (gutterTargetsMap.get(gutterTargetEl) || 0) + 1
+            );
+          }
         }
       }
 
+      for (const [targetEl, count] of gutterTargetsMap.entries()) {
+        targetEl.setAttribute('data-omni-comments', String(count));
+      }
       for (const [blockEl, count] of blockCounts.entries()) {
         blockEl.setAttribute('data-omni-comments', String(count));
       }
       activeBlockCounts = blockCounts;
+      activeGutterTargets = gutterTargetsMap;
 
       if (window.CSS && CSS.highlights && window.Highlight) {
         if (normalHighlightRanges.length > 0) {
@@ -1998,6 +2094,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       }
     } else {
       activeBlockCounts = new Map();
+      activeGutterTargets = new Map();
       if (window.CSS && CSS.highlights) {
         CSS.highlights.delete('omni-comment');
         CSS.highlights.delete('omni-comment-focused');
@@ -2048,21 +2145,8 @@ export function initOmniAnnotations(getMarkdownValue) {
         e.clientX <= blockRect.left + 16 ||
         e.clientX >= blockRect.right - 40;
       if (isGutterClick) {
-        const blockItems = commentRanges.filter(item => item.blockEl === targetEl);
-        if (blockItems.length > 0) {
-          const allCollapsed = blockItems.every(item =>
-            collapsedComments.has(item.comment.id)
-          );
-          for (const item of blockItems) {
-            if (allCollapsed) {
-              collapsedComments.delete(item.comment.id);
-            } else {
-              collapsedComments.add(item.comment.id);
-            }
-          }
-          renderInlineZones();
-          return;
-        }
+        toggleCommentsForTarget(targetEl, commentRanges);
+        return;
       }
     }
 
@@ -2198,6 +2282,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   }
 
   function getInlineState() {
+    const contentRoot = getContentRoot();
     const threadElsMap = new Map();
     zonesLayer.querySelectorAll('.omni-inline-thread[data-comment-id]').forEach(el => {
       const cid = el.getAttribute('data-comment-id');
@@ -2260,7 +2345,71 @@ export function initOmniAnnotations(getMarkdownValue) {
           ? (CSS.highlights.get('omni-comment')?.size || 0) +
             (CSS.highlights.get('omni-comment-focused')?.size || 0)
           : 0,
-      threads
+      threads,
+      gutterChipCount: gutterLayer ? gutterLayer.querySelectorAll('.omni-gutter-chip').length : 0,
+      gutterChips: gutterLayer
+        ? Array.from(gutterLayer.querySelectorAll('.omni-gutter-chip')).map(c => ({
+            top: c.style.top,
+            left: c.style.left,
+            className: c.className,
+            isCollapsed: c.classList.contains('is-collapsed'),
+            text: c.textContent
+          }))
+        : [],
+      activeBlockCountsSize: activeBlockCounts.size,
+      activeGutterTargetsSize: activeGutterTargets.size,
+      activeGutterTargets: Array.from(activeGutterTargets.keys()).map(
+        b => {
+          if (!b || typeof b.getBoundingClientRect !== 'function') {
+            return { tag: 'unknown', top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+          }
+          const rect = b.getBoundingClientRect();
+          return {
+            tag: b.tagName,
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height
+          };
+        }
+      ),
+      activeBlocks: Array.from(activeBlockCounts.keys()).map(
+        b => {
+          if (!b || typeof b.getBoundingClientRect !== 'function') {
+            return { tag: 'unknown', top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+          }
+          const rect = b.getBoundingClientRect();
+          return {
+            tag: b.tagName,
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height
+          };
+        }
+      ),
+      viewportRect: (contentRoot && typeof contentRoot.getBoundingClientRect === 'function') ? (() => {
+        const r = contentRoot.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height };
+      })() : null,
+      commentRangesCount: commentRanges.length,
+      commentRangesDetails: commentRanges.map(cr => {
+        const rects = cr.range ? cr.range.getClientRects() : [];
+        const firstRect = rects.length > 0 ? rects[0] : null;
+        return {
+          commentId: cr.comment.id,
+          blockTag: cr.blockEl?.tagName,
+          gutterTargetTag: cr.gutterTargetEl?.tagName,
+          rangeTop: firstRect ? firstRect.top : null,
+          rangeBottom: firstRect ? firstRect.bottom : null,
+          rangeLeft: firstRect ? firstRect.left : null
+        };
+      }),
+      commentRangesBlocks: commentRanges.map(cr => cr.blockEl?.tagName || '')
     };
   }
 

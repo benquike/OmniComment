@@ -5,7 +5,7 @@ import { mapVscodeLanguageToVditorLang } from "./lang.js";
 import { bindLinkErrors } from "./linkError.js";
 import { refreshExportDialogProState } from "./exportDialog.js";
 import { toggleMarkmapView, refreshMarkmapProLock } from "./markmapView.js";
-import { initOmniAnnotations } from "./omniAnnotations.js?v=0.1.7";
+import { initOmniAnnotations } from "./omniAnnotations.js?v=0.1.8";
 
 
 const removeLockedDecorations = (root) => {
