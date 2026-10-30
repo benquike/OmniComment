@@ -403,9 +403,9 @@ function resolveBlockElement(node, contentRoot) {
   return null;
 }
 
-// Invariant: Resolves the closest semantic text boundary (including table cells) for DOM text walker tokenization.
-// Why: Prevents adjacent table cell text from concatenating without word boundaries during anchor search.
-// Example: text node in <td>Col 1</td> resolves to <td> rather than the enclosing <table>.
+// Invariant: Resolves the closest semantic text boundary (including table cells and code lines) for DOM text walker tokenization.
+// Why: Prevents adjacent table cell text and CodeMirror code lines from concatenating without word boundaries during anchor search.
+// Example: text node in <td>Col 1</td> resolves to <td>; text node in <div class="cm-line"> resolves to .cm-line.
 function resolveTextBoundaryElement(node, contentRoot) {
   const el = node instanceof Element ? node : node?.parentElement;
   if (!el || !contentRoot || !contentRoot.contains(el)) return null;
@@ -413,12 +413,16 @@ function resolveTextBoundaryElement(node, contentRoot) {
   if (cellEl && isEligibleBlock(cellEl.closest('table'), contentRoot)) {
     return cellEl;
   }
+  const cmLine = el.closest('.cm-line');
+  if (cmLine && contentRoot.contains(cmLine)) {
+    return cmLine;
+  }
   return resolveBlockElement(node, contentRoot);
 }
 
-// Invariant: Resolves the precise row or block element for gutter bubble icon positioning.
-// Why: Comments in table cells must align with their specific <tr> row rather than the table top header.
-// Example: comment on text in row 3 targets that row's <tr> element for its gutter chip.
+// Invariant: Resolves the precise row, code line, or block element for gutter bubble icon positioning.
+// Why: Comments in table cells align with their <tr> row, and comments in code blocks align with their .cm-line.
+// Example: comment on code line 2 targets that line's .cm-line element for its gutter chip.
 function resolveGutterTargetElement(range, blockEl) {
   if (range && range.startContainer) {
     const parent = range.startContainer instanceof Element
@@ -427,6 +431,10 @@ function resolveGutterTargetElement(range, blockEl) {
     const trEl = parent?.closest('tr');
     if (trEl && blockEl && blockEl.contains(trEl)) {
       return trEl;
+    }
+    const cmLine = parent?.closest('.cm-line');
+    if (cmLine && blockEl && blockEl.contains(cmLine)) {
+      return cmLine;
     }
   }
   return blockEl;
@@ -448,6 +456,22 @@ function getFallbackBlock(contentRoot) {
   return contentRoot;
 }
 
+// Invariant: Verifies whether an element or any of its ancestors should be excluded from DOM text indexing.
+// Why: Skips UI overlays, hidden code blocks (e.g. hidden raw <code> beneath CodeMirror), markers, and toolbars.
+// Example: isTreeWalkerExcludedNode(<code style="display: none">) => true
+function isTreeWalkerExcludedNode(parent) {
+  if (!parent) return true;
+  const isExcludedAncestor = Boolean(
+    parent.closest(
+      '.vditor-editor-boundary, .vditor-wysiwyg__marker, .vditor-ir__marker, .vditor-ir__preview, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, .vditor-cm-chrome, .cm-gutters, .cm-announced, [hidden], [aria-hidden="true"], script, style'
+    )
+  );
+  if (isExcludedAncestor) return true;
+  return Boolean(
+    parent.closest('code[style*="display: none"], code[style*="display:none"]')
+  );
+}
+
 function buildDomTextMap(container) {
   const chars = [];
   const positions = [];
@@ -459,12 +483,7 @@ function buildDomTextMap(container) {
     {
       acceptNode(node) {
         const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        if (
-          parent.closest(
-            '.vditor-editor-boundary, .vditor-wysiwyg__marker, .vditor-ir__marker, .vditor-ir__preview, .vditor-toolbar, .vditor-outline, .vditor-hint, .omni-inline-zones-layer, .omni-selection-chip, script, style'
-          )
-        ) {
+        if (isTreeWalkerExcludedNode(parent)) {
           return NodeFilter.FILTER_REJECT;
         }
         return NodeFilter.FILTER_ACCEPT;
@@ -1010,19 +1029,34 @@ export function initOmniAnnotations(getMarkdownValue) {
     return { text: '', blockEl: null };
   }
 
+  // Invariant: Resolves enclosing block element for candidate anchor text across raw and stripped representations.
+  // Why: Guarantees reliable block anchoring for both code blocks (raw exact) and formatted markdown prose.
+  // Example: findBlockForAnchorText("return amount * 0.15;", root) => <pre class="vditor-wysiwyg__pre...">
   function findBlockForAnchorText(anchorText, contentRoot) {
     if (!contentRoot) return null;
+    const raw = (anchorText || '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/\u00A0/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     const norm = stripMarkdownSyntax(anchorText);
-    if (norm) {
-      const domMap = buildDomTextMap(contentRoot);
-      let idx = domMap.text.indexOf(norm);
+    const domMap = buildDomTextMap(contentRoot);
+    let idx = -1;
+    if (raw) {
+      idx = domMap.text.indexOf(raw);
+    }
+    if (idx === -1 && norm) {
+      idx = domMap.text.indexOf(norm);
       if (idx === -1) {
         idx = domMap.text.toLowerCase().indexOf(norm.toLowerCase());
       }
-      if (idx !== -1 && domMap.positions[idx]) {
-        const block = resolveBlockElement(domMap.positions[idx].node, contentRoot);
-        if (block) return block;
-      }
+    }
+    if (idx === -1 && raw) {
+      idx = domMap.text.toLowerCase().indexOf(raw.toLowerCase());
+    }
+    if (idx !== -1 && domMap.positions[idx]) {
+      const block = resolveBlockElement(domMap.positions[idx].node, contentRoot);
+      if (block) return block;
     }
     return getFallbackBlock(contentRoot);
   }
@@ -1081,11 +1115,11 @@ export function initOmniAnnotations(getMarkdownValue) {
     return Math.max(minAllowedLeft, desiredLeft);
   }
 
-  // Invariant: Calculates vertical pixel placement for gutter chip aligned to block or table row.
-  // Why: Table rows require row-centered alignment, while standard paragraph blocks align near top edge.
-  // Example: calculateGutterChipTop(trElement, { top: 254, height: 28 }) => 257
+  // Invariant: Calculates vertical pixel placement for gutter chip aligned to block, table row, or code line.
+  // Why: Table rows and code lines require row-centered alignment, while standard paragraph blocks align near top edge.
+  // Example: calculateGutterChipTop(cmLineEl, { top: 254, height: 28 }) => 257
   function calculateGutterChipTop(targetEl, bRect) {
-    if (targetEl.tagName === 'TR') {
+    if (targetEl.tagName === 'TR' || targetEl.classList?.contains('cm-line')) {
       return Math.round(bRect.top + Math.max(0, (bRect.height - 22) / 2));
     }
     return Math.round(
@@ -1093,12 +1127,15 @@ export function initOmniAnnotations(getMarkdownValue) {
     );
   }
 
-  // Invariant: Resolves the horizontal anchor element to measure left gutter offset for a comment target.
-  // Why: Table rows inherit their left margin from the enclosing table element rather than arbitrary cell boundaries.
-  // Example: resolveGutterAnchorBlock(trElement) => tableElement
+  // Invariant: Resolves horizontal anchor element to measure left gutter offset for a comment target.
+  // Why: Table rows and code lines inherit left margin from enclosing table or pre block rather than arbitrary inner boundaries.
+  // Example: resolveGutterAnchorBlock(cmLineEl) => preElement
   function resolveGutterAnchorBlock(targetEl) {
     if (targetEl.tagName === 'TR') {
       return targetEl.closest('table') || targetEl;
+    }
+    if (targetEl.classList?.contains('cm-line')) {
+      return targetEl.closest('pre') || targetEl;
     }
     return targetEl;
   }
@@ -1993,18 +2030,42 @@ export function initOmniAnnotations(getMarkdownValue) {
       const gutterTargetsMap = new Map();
 
       for (const comment of activeComments) {
+        const rawAnchor = (comment.anchor?.text || '')
+          .replace(/[\u200B-\u200D\uFEFF]/g, '')
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
         const searchNorm = stripMarkdownSyntax(comment.anchor?.text || '');
         let matchIdx = -1;
-        if (searchNorm) {
+        let matchedSearchLen = 0;
+
+        if (rawAnchor) {
+          matchIdx = domMap.text.indexOf(rawAnchor);
+          if (matchIdx !== -1) {
+            matchedSearchLen = rawAnchor.length;
+          }
+        }
+        if (matchIdx === -1 && searchNorm) {
           matchIdx = domMap.text.indexOf(searchNorm);
-          if (matchIdx === -1) {
+          if (matchIdx !== -1) {
+            matchedSearchLen = searchNorm.length;
+          } else {
             matchIdx = normDomLower.indexOf(searchNorm.toLowerCase());
+            if (matchIdx !== -1) {
+              matchedSearchLen = searchNorm.length;
+            }
+          }
+        }
+        if (matchIdx === -1 && rawAnchor) {
+          matchIdx = normDomLower.indexOf(rawAnchor.toLowerCase());
+          if (matchIdx !== -1) {
+            matchedSearchLen = rawAnchor.length;
           }
         }
 
-        if (matchIdx !== -1) {
+        if (matchIdx !== -1 && matchedSearchLen > 0) {
           const startPos = domMap.positions[matchIdx];
-          const endPos = domMap.positions[matchIdx + searchNorm.length - 1];
+          const endPos = domMap.positions[matchIdx + matchedSearchLen - 1];
           if (startPos && endPos) {
             try {
               const range = new Range();
@@ -2404,6 +2465,8 @@ export function initOmniAnnotations(getMarkdownValue) {
           commentId: cr.comment.id,
           blockTag: cr.blockEl?.tagName,
           gutterTargetTag: cr.gutterTargetEl?.tagName,
+          hasRange: Boolean(cr.range),
+          rectsLength: rects.length,
           rangeTop: firstRect ? firstRect.top : null,
           rangeBottom: firstRect ? firstRect.bottom : null,
           rangeLeft: firstRect ? firstRect.left : null

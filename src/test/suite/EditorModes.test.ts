@@ -12,6 +12,7 @@ import {
   resolveAnchorSelectionForThread
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
+import { CommentDecorator } from '../../decorators/CommentDecorator';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
@@ -480,6 +481,138 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     assert.strictEqual(multiRowState.activeGutterTargetsSize, 2, 'Must track 2 distinct TR targets');
     const chipTops = multiRowState.gutterChips.map((c: any) => parseFloat(c.top));
     assert.notStrictEqual(chipTops[0], chipTops[1], 'Gutter chips on different table rows must have distinct vertical tops');
+  });
+
+  // Topology: Markdown with code block -> open in cweijan.markdownViewer -> add comment in code block -> query inline state
+  // Expected: Code block text is matched and highlighted (highlightCount >= 1), commentRanges has non-null range, attached to pre/code block.
+  test('Mode 4C: Code block comment highlights text and attaches to code block', async () => {
+    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
+    if (!officeExt) {
+      return;
+    }
+
+    const filePath = path.join(tempDir, 'mode4-codeblock.md');
+    fs.writeFileSync(
+      filePath,
+      '# Code Block Document\n\n```typescript\nfunction calculateTax(amount: number): number {\n  return amount * 0.15;\n}\n```\n\nEnding paragraph.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+
+    await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
+    await waitForCondition(() => {
+      const activeTab = vscode.window.tabGroups?.activeTabGroup?.activeTab;
+      return Boolean(activeTab && activeTab.input && 'viewType' in (activeTab.input as object));
+    });
+
+    const ctx = await getActiveMarkdownContext(fileUri);
+    assert.ok(ctx);
+
+    const codeCommentText = 'Reviewing calculateTax implementation';
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: 'return amount * 0.15;',
+      content: codeCommentText
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 1;
+    });
+
+    let codeState: any = null;
+    await waitForCondition(async () => {
+      codeState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(codeState && codeState.threadCount === 1);
+    }, 10000);
+
+    console.log('CODE BLOCK INLINE STATE:', JSON.stringify(codeState, null, 2));
+    assert.ok(codeState, 'Code block inline state must be retrieved');
+    assert.strictEqual(codeState.threadCount, 1);
+    assert.ok(codeState.highlightCount >= 1, `Highlight count must be at least 1, but got ${codeState.highlightCount}`);
+    assert.ok(codeState.commentRangesDetails[0].hasRange, 'Code block comment must have valid Range');
+    assert.ok(
+      codeState.commentRangesDetails[0].rectsLength >= 1,
+      'Code block range must have client rects in visible CodeMirror'
+    );
+    assert.ok(
+      codeState.commentRangesDetails[0].rangeTop !== null,
+      'Code block range must have a valid vertical rangeTop coordinate'
+    );
+
+    // Invariant: Collapse comment and verify gutter chip displays collapsed bubble icon aligned to code line
+    let collapsedCodeState: any = null;
+    await waitForCondition(async () => {
+      collapsedCodeState = await queryMarkdownEditorInlineStateForTesting(
+        '.omni-collapse-chevron',
+        800
+      );
+      return Boolean(collapsedCodeState && collapsedCodeState.threads?.[0]?.isCollapsed);
+    }, 10000);
+
+    assert.ok(collapsedCodeState, 'Collapsed code state must be retrieved');
+    assert.strictEqual(collapsedCodeState.gutterChips[0].isCollapsed, true);
+    assert.ok(collapsedCodeState.gutterChips[0].text.includes('💬'));
+    const codeChipTop = parseFloat(collapsedCodeState.gutterChips[0].top);
+    assert.ok(
+      codeChipTop > 180,
+      `Code block gutter chip top (${codeChipTop}px) must align with code line 2 (>180px)`
+    );
+  });
+
+  // Topology: Markdown with code block -> openTextDocument -> select code -> omnicomment.addComment -> applyDecorations
+  // Expected: Comment persists in code block, getCommentRange resolves exact code line, decorations applied.
+  test('Mode 1H: Code block commenting and decoration in standard TextEditor mode', async () => {
+    const filePath = path.join(tempDir, 'mode1-codeblock.md');
+    fs.writeFileSync(
+      filePath,
+      '# Code Block Document\n\n```typescript\nfunction calculateTax(amount: number): number {\n  return amount * 0.15;\n}\n```\n\nEnding paragraph.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    const term = 'return amount * 0.15;';
+    const lineIndex = 4;
+    const startChar = document.lineAt(lineIndex).text.indexOf(term);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(lineIndex, startChar),
+      new vscode.Position(lineIndex, startChar + term.length)
+    );
+
+    const commentBody = 'Verify tax calculation formula in TextEditor';
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: commentBody
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 1;
+    });
+
+    const comments = commentService.parseComments(document);
+    assert.strictEqual(comments.length, 1);
+    assert.strictEqual(comments[0].anchor.text, term);
+    assert.strictEqual(comments[0].content, commentBody);
+
+    const decorator = new CommentDecorator();
+    try {
+      decorator.applyDecorations(editor, comments);
+      const foundComment = decorator.findCommentAtPosition(
+        document,
+        new vscode.Position(lineIndex, startChar + 2),
+        comments
+      );
+      assert.ok(foundComment, 'Comment must be found at position inside code block');
+      assert.strictEqual(foundComment.id, comments[0].id);
+    } finally {
+      decorator.dispose();
+    }
   });
 
   // Topology: .txt file -> openTextDocument -> omnicomment.editorCommentAction -> parseComments

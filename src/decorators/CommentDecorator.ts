@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { AnchorEngine } from '../core/AnchorEngine';
 import { Comment, isSupportedCommentDocument } from '../types';
 
 /**
@@ -155,12 +156,22 @@ export class CommentDecorator {
       return range;
     }
 
-    // Text doesn't match, try to find it in the document
+    // Text doesn't match, try to find it in the document using exact index first
     const fullText = document.getText();
     const index = fullText.indexOf(anchor.text);
     if (index !== -1) {
       const foundStart = document.positionAt(index);
       const foundEnd = document.positionAt(index + anchor.text.length);
+      return new vscode.Range(foundStart, foundEnd);
+    }
+
+    // Invariant: Locates anchor range using AnchorEngine multi-tier matching when cached line coordinates drift.
+    // Why: Recovers highlighting after file edits, formatting changes, or cross-editor round-trips.
+    // Example: locateAnchor(fullText, "return amount * 0.15;") => Range(line 4:2 - line 4:23)
+    const match = AnchorEngine.locateAnchor(fullText, anchor.text);
+    if (match) {
+      const foundStart = new vscode.Position(match.startLine, match.startChar);
+      const foundEnd = new vscode.Position(match.endLine, match.endChar);
       return new vscode.Range(foundStart, foundEnd);
     }
 
