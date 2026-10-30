@@ -11,7 +11,9 @@ import {
   getInlineCommentControllerForTesting,
   getCommentBoxConfig,
   saveCommentBoxConfigHandler,
-  resolveAnchorSelectionForThread
+  resolveAnchorSelectionForThread,
+  parseAddCommentArgument,
+  ensureGlyphMarginForDocument
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
 import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
@@ -372,6 +374,7 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     );
     assert.strictEqual(pkg.contributes.configurationDefaults['[plaintext]']['editor.glyphMargin'], true);
     assert.strictEqual(pkg.contributes.configurationDefaults['[markdown]']['editor.glyphMargin'], true);
+    assert.strictEqual(pkg.contributes.configurationDefaults['[txt]']['editor.glyphMargin'], true);
     assert.strictEqual(pkg.contributes.configurationDefaults['[log]']['editor.glyphMargin'], true);
     assert.ok(
       pkg.contributes.menus['editor/lineNumber/context'].some(
@@ -487,5 +490,44 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     await saveCommentBoxConfigHandler({ fontSize: 13 });
     const updated = getCommentBoxConfig();
     assert.strictEqual(updated.fontSize, 13);
+  });
+
+  // Topology: Gutter comment (+) click / line-number right-click / hover array -> parseAddCommentArgument -> structured options
+  // Expected: Extracts preferredUri, targetRange, content, and selectedText from polymorphic argument payloads.
+  test('Txt 11: parseAddCommentArgument parses gutter click, line context, and hover arguments', () => {
+    // Case 1: VS Code CommentReply (from gutter + comment range)
+    const threadRange = new vscode.Range(2, 0, 2, 10);
+    const mockThread = {
+      uri: vscode.Uri.file('/tmp/notes.txt'),
+      range: threadRange
+    };
+    const replyArg = {
+      thread: mockThread,
+      text: 'Gutter comment text'
+    };
+    const parsedReply = parseAddCommentArgument(replyArg);
+    assert.strictEqual(parsedReply.preferredUri?.path, '/tmp/notes.txt');
+    assert.strictEqual(parsedReply.targetRange?.start.line, 2);
+    assert.strictEqual(parsedReply.content, 'Gutter comment text');
+
+    // Case 2: Line number context (from editor/lineNumber/context)
+    const lineArg = {
+      lineNumber: 5,
+      uri: vscode.Uri.file('/tmp/notes.txt')
+    };
+    const parsedLine = parseAddCommentArgument(lineArg);
+    assert.strictEqual(parsedLine.preferredUri?.path, '/tmp/notes.txt');
+    assert.strictEqual(parsedLine.targetRange?.start.line, 4);
+
+    // Case 3: Hover parameter array
+    const hoverArg = [
+      {
+        uri: vscode.Uri.file('/tmp/notes.txt'),
+        selectedText: 'Highlighted text'
+      }
+    ];
+    const parsedHover = parseAddCommentArgument(hoverArg);
+    assert.strictEqual(parsedHover.preferredUri?.path, '/tmp/notes.txt');
+    assert.strictEqual(parsedHover.selectedText, 'Highlighted text');
   });
 });

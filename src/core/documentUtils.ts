@@ -12,6 +12,15 @@ export const SUPPORTED_COMMENT_EXTENSIONS = [
   '.log'
 ];
 
+const SUPPORTED_COMMENT_LANGUAGES = new Set([
+  'markdown',
+  'skill',
+  'plaintext',
+  'text',
+  'txt',
+  'log'
+]);
+
 // Invariant: Checks whether the given language ID is supported by OmniComment.
 // Why: Enables universal commenting across Markdown, plain text (.txt), SKILL, and log files.
 // Example: isSupportedCommentLanguage('plaintext') => true, isSupportedCommentLanguage('python') => false.
@@ -19,13 +28,7 @@ export function isSupportedCommentLanguage(languageId?: string): boolean {
   if (!languageId) {
     return false;
   }
-  return (
-    languageId === 'markdown' ||
-    languageId === 'skill' ||
-    languageId === 'plaintext' ||
-    languageId === 'text' ||
-    languageId === 'log'
-  );
+  return SUPPORTED_COMMENT_LANGUAGES.has(languageId.toLowerCase());
 }
 
 // Invariant: Checks whether the given URI has an extension supported by OmniComment.

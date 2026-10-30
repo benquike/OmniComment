@@ -76,7 +76,11 @@ export class InlineCommentController implements vscode.Disposable {
           loc !== null
             ? Math.max(0, document.positionAt(loc.index).line - 1)
             : Math.max(0, document.lineCount - 1);
-        return [new vscode.Range(0, 0, endLine, 0)];
+        const lastLineLength =
+          document.lineCount > 0
+            ? document.lineAt(Math.min(endLine, document.lineCount - 1)).text.length
+            : 0;
+        return [new vscode.Range(0, 0, endLine, lastLineLength)];
       }
     };
   }

@@ -2,7 +2,7 @@
   "name": "omnicomment",
   "displayName": "OmniComment - Universal Comments & Annotations",
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "license": "MIT",
   "publisher": "benquike",
   "repository": {
@@ -25,6 +25,7 @@
     "onLanguage:skill",
     "onLanguage:plaintext",
     "onLanguage:text",
+    "onLanguage:txt",
     "onLanguage:log",
     "onCommand:omnicomment.addComment",
     "onCommand:omnicomment.toggleSidebar",
@@ -44,6 +45,9 @@
         "editor.glyphMargin": true
       },
       "[text]": {
+        "editor.glyphMargin": true
+      },
+      "[txt]": {
         "editor.glyphMargin": true
       },
       "[log]": {
@@ -185,36 +189,36 @@
       ],
       "editor/lineNumber/context": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i",
           "command": "omnicomment.addComment",
           "group": "navigation@1"
         }
       ],
       "editor/context": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i",
           "command": "omnicomment.addComment",
           "group": "navigation@1"
         },
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i",
           "command": "omnicomment.configureCommentBox",
           "group": "navigation@2"
         }
       ],
       "editor/title": [
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
           "command": "omnicomment.addComment",
           "group": "navigation@1"
         },
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i",
           "command": "omnicomment.toggleCollapseAllComments",
           "group": "navigation@2"
         },
         {
-          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
+          "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor",
           "command": "omnicomment.configureCommentBox",
           "group": "navigation@3"
         }
@@ -266,7 +270,7 @@
         "command": "omnicomment.addComment",
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
-        "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
+        "when": "editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor"
       }
     ],
     "configuration": {

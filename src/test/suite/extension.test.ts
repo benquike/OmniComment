@@ -108,15 +108,15 @@ suite('Extension Test Suite', () => {
 
       assert.strictEqual(
         editorContextWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log'
+        'editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i'
       );
       assert.strictEqual(
         editorTitleWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
       assert.strictEqual(
         keybindingWhen,
-        'editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
+        'editorLangId =~ /^(markdown|skill|plaintext|text|txt|log)$/ || resourceExtname =~ /\\.(md|markdown|mdown|mkdn|mkd|skill|txt|text|log)$/i || activeCustomEditorId == cweijan.markdownViewer || activeCustomEditorId == zaaack.markdown-editor'
       );
     });
 

@@ -85,15 +85,14 @@ export class CommentDecorator {
     this.decorationType = this.createDecorationType(false);
     this.focusedDecorationType = this.createDecorationType(true);
 
-    const iconPath =
-      this.gutterIconUri?.scheme === 'file'
-        ? this.gutterIconUri.fsPath
-        : this.gutterIconUri;
-
     this.selectionGutterDecorationType = vscode.window.createTextEditorDecorationType({
-      gutterIconPath: iconPath,
+      gutterIconPath: this.gutterIconUri,
       gutterIconSize: 'contain',
       cursor: 'pointer',
+      isWholeLine: false,
+      overviewRulerColor: '#f59e0b',
+      overviewRulerLane: vscode.OverviewRulerLane.Right,
+      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
       after: {
         contentText: ' 💬 Add Comment (Ctrl+Shift+M)',
         color: '#ffffff',
@@ -323,8 +322,12 @@ export class CommentDecorator {
     }
 
     const preview = selectedText.length > 30 ? `${selectedText.slice(0, 27)}...` : selectedText;
+    const docUriStr = editor.document?.uri ? editor.document.uri.toString() : '';
+    const argsJson = encodeURIComponent(
+      JSON.stringify([{ uri: docUriStr, selectedText }])
+    );
     const hoverMd = new vscode.MarkdownString(
-      `💬 **OmniComment**: Add comment on "${preview}"\n\n[$(comment) **Click to Add Comment**](command:omnicomment.addComment) *(Ctrl+Shift+M)*`,
+      `💬 **OmniComment**: Add comment on "${preview}"\n\n[$(comment) **Click to Add Comment**](command:omnicomment.addComment?${argsJson}) *(Ctrl+Shift+M)*`,
       true
     );
     hoverMd.isTrusted = true;

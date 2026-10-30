@@ -355,21 +355,28 @@ async function saveDocumentIfCustomEditor(ctx: {
   }
 }
 
-export function activate(context: vscode.ExtensionContext) {
-  isTestMode = context.extensionMode === vscode.ExtensionMode.Test;
-  console.log('OmniComment extension is now active');
-
-  // Invariant: Ensure editor.glyphMargin is globally active so gutter comment icons never collapse.
-  // Why: Gutter icons require glyph margin width > 0 to be rendered in standard text editors.
-  // Example: glyphMargin=false -> collapsed gutter (invisible); glyphMargin=true -> visible gutter icon.
+// Invariant: Ensures editor.glyphMargin is active for supported documents so gutter icons are visible.
+// Why: Standard text editors (like plaintext .txt) collapse the glyph margin by default if not explicitly enabled.
+// Example: ensureGlyphMarginForDocument(doc) ensures glyphMargin: true in configuration.
+export function ensureGlyphMarginForDocument(document?: vscode.TextDocument): void {
+  if (!document || !isSupportedCommentDocument(document)) {
+    return;
+  }
   try {
-    const editorConfig = vscode.workspace.getConfiguration('editor');
-    if (!editorConfig.get<boolean>('glyphMargin')) {
-      editorConfig.update('glyphMargin', true, vscode.ConfigurationTarget.Global);
+    const docConfig = vscode.workspace.getConfiguration('editor', document);
+    if (!docConfig.get<boolean>('glyphMargin')) {
+      docConfig.update('glyphMargin', true, vscode.ConfigurationTarget.Global);
     }
   } catch {
     // Non-critical if settings update is denied in test sandbox
   }
+}
+
+export function activate(context: vscode.ExtensionContext) {
+  isTestMode = context.extensionMode === vscode.ExtensionMode.Test;
+  console.log('OmniComment extension is now active');
+
+  ensureGlyphMarginForDocument(vscode.window.activeTextEditor?.document);
 
   syncMarkdownEditorIntegration(context.extensionPath);
 
@@ -685,6 +692,9 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   const handleEditorSelectionOrActiveChange = (editor?: vscode.TextEditor): void => {
+    if (editor?.document) {
+      ensureGlyphMarginForDocument(editor.document);
+    }
     updateStatusBar(editor);
     commentDecorator.updateSelectionDecoration(editor);
   };
@@ -1230,6 +1240,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Listen for document opens
   context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument(async doc => {
+      ensureGlyphMarginForDocument(doc);
       if (
         isMarkdownCompatibleLanguage(doc.languageId) ||
         isMarkdownCompatibleUri(doc.uri)
@@ -1643,39 +1654,84 @@ async function promptForTextEditorCommentContent(selectedText: string): Promise<
   return entered && entered.trim() ? entered.trim() : undefined;
 }
 
-async function addCommentCommand(arg?: unknown) {
-  let preferredUri: vscode.Uri | undefined;
-  let passedSelectedText: string | undefined;
-  let passedContent: string | undefined;
-  let openSidebar = false;
+export interface ParsedAddCommentOptions {
+  preferredUri?: vscode.Uri;
+  selectedText?: string;
+  content?: string;
+  targetRange?: vscode.Range;
+  openSidebar: boolean;
+}
 
-  if (arg) {
-    const directUri = toVscodeUri(arg);
-    if (directUri) {
-      preferredUri = directUri;
-    } else if (typeof arg === 'object') {
-      const obj = arg as {
-        uri?: unknown;
-        selectedText?: unknown;
-        content?: unknown;
-        openSidebar?: unknown;
-      };
-      if (obj.uri) {
-        preferredUri = toVscodeUri(obj.uri);
-      }
-      if (typeof obj.selectedText === 'string' && obj.selectedText.trim()) {
-        passedSelectedText = cleanCopiedSelection(obj.selectedText);
-      }
-      if (typeof obj.content === 'string' && obj.content.trim()) {
-        passedContent = obj.content.trim();
-      }
-      if (typeof obj.openSidebar === 'boolean') {
-        openSidebar = obj.openSidebar;
-      }
+// Invariant: Parses polymorphic arguments passed to omnicomment.addComment from menus, hover links, and gutter icons.
+// Why: Unifies handling of Uri, CommentReply, LineNumberContext, hover parameter arrays, and object payloads.
+// Example: parseAddCommentArgument({ thread: { uri, range } }) => extracts preferredUri and targetRange.
+export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions {
+  const result: ParsedAddCommentOptions = {
+    openSidebar: false
+  };
+
+  if (!arg) {
+    return result;
+  }
+
+  // Handle single Uri
+  const directUri = toVscodeUri(arg);
+  if (directUri) {
+    result.preferredUri = directUri;
+    return result;
+  }
+
+  // Handle array from markdown link command:command?args
+  const candidate = Array.isArray(arg) && arg.length > 0 ? arg[0] : arg;
+  if (!candidate || typeof candidate !== 'object') {
+    return result;
+  }
+
+  const obj = candidate as Record<string, unknown>;
+
+  // Check for VS Code native CommentReply (from gutter + comment range)
+  if (obj.thread && typeof obj.thread === 'object') {
+    const thread = obj.thread as { uri?: unknown; range?: unknown };
+    result.preferredUri = toVscodeUri(thread.uri);
+    if (thread.range instanceof vscode.Range) {
+      result.targetRange = thread.range;
+    }
+    if (typeof obj.text === 'string' && obj.text.trim()) {
+      result.content = obj.text.trim();
     }
   }
 
-  const ctx = await getActiveMarkdownContext(preferredUri);
+  // Check for line number context (from editor/lineNumber/context)
+  if (typeof obj.lineNumber === 'number' && obj.uri) {
+    result.preferredUri = toVscodeUri(obj.uri);
+    const lineZero = Math.max(0, obj.lineNumber - 1);
+    result.targetRange = new vscode.Range(lineZero, 0, lineZero, 0);
+  }
+
+  // Check for standard fields
+  if (obj.uri && !result.preferredUri) {
+    result.preferredUri = toVscodeUri(obj.uri);
+  }
+  if (typeof obj.selectedText === 'string' && obj.selectedText.trim()) {
+    result.selectedText = cleanCopiedSelection(obj.selectedText);
+  }
+  if (typeof obj.content === 'string' && obj.content.trim()) {
+    result.content = obj.content.trim();
+  }
+  if (typeof obj.openSidebar === 'boolean') {
+    result.openSidebar = obj.openSidebar;
+  }
+  if (obj.range instanceof vscode.Range && !result.targetRange) {
+    result.targetRange = obj.range;
+  }
+
+  return result;
+}
+
+async function addCommentCommand(arg?: unknown) {
+  const options = parseAddCommentArgument(arg);
+
+  const ctx = await getActiveMarkdownContext(options.preferredUri);
   if (!ctx) {
     vscode.window.showErrorMessage('Please open an active document to add comments');
     return;
@@ -1686,21 +1742,24 @@ async function addCommentCommand(arg?: unknown) {
   if (ctx.editor) {
     let selection = ctx.editor.selection;
 
-    // If no text is selected, expand selection based on cursor position
-    if (selection.isEmpty) {
-      selection = expandSelectionAtCursor(ctx.editor.document, selection.active);
-      // Update editor selection to show what will be commented
+    if (options.targetRange && !options.targetRange.isEmpty) {
+      selection = new vscode.Selection(options.targetRange.start, options.targetRange.end);
+      ctx.editor.selection = selection;
+    } else if (selection.isEmpty) {
+      const targetPos = options.targetRange ? options.targetRange.start : selection.active;
+      selection = expandSelectionAtCursor(ctx.editor.document, targetPos);
       ctx.editor.selection = selection;
     }
 
-    const selectedText = ctx.editor.document.getText(selection);
+    const selectedText = options.selectedText || ctx.editor.document.getText(selection);
 
-    if (openSidebar) {
+    if (options.openSidebar) {
       sidebarProvider.showAddCommentForm(true, selectedText, true);
       return;
     }
 
-    const commentBody = passedContent || (await promptForTextEditorCommentContent(selectedText));
+    const commentBody =
+      options.content || (await promptForTextEditorCommentContent(selectedText));
     if (!commentBody) {
       sidebarProvider.showAddCommentForm(true, selectedText, false);
       return;
@@ -1714,12 +1773,12 @@ async function addCommentCommand(arg?: unknown) {
     }
   } else {
     // Custom editor / viewer mode (e.g., "Markdown Editor")
-    let anchorCandidate = passedSelectedText;
+    let anchorCandidate = options.selectedText;
     if (!anchorCandidate) {
       anchorCandidate = await captureSelectionFromCustomEditor(ctx.document);
     }
     sidebarProvider.showAddCommentForm(Boolean(anchorCandidate), anchorCandidate, true);
-    if (!openSidebar) {
+    if (!options.openSidebar) {
       // Open the inline comment composer directly inside "Markdown Editor"
       await vscode.commands
         .executeCommand(
