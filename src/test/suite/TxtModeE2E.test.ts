@@ -568,4 +568,42 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     provider.setTargetForTesting(editor);
     assert.strictEqual(provider.provideCodeLenses(document).length, 0, 'Lens must vanish on deselect');
   });
+
+  // Topology: lens/hover built for selection A -> user selects B -> stale command fires -> addComment
+  // Expected: Comment anchors to the live selection B, never the stale A; each selection gets its own box.
+  test('Txt 13: Different selections produce different comment boxes (no stale anchor reuse)', async () => {
+    const filePath = path.join(tempDir, 'stale-selection.txt');
+    fs.writeFileSync(filePath, 'alpha first line\nbravo second line\ncharlie third line\n', 'utf-8');
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const editor = await vscode.window.showTextDocument(document);
+    const provider = getSelectionCodeLensProviderForTesting();
+
+    // Lens captured while "alpha" was selected
+    editor.selection = new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 5));
+    provider.setTargetForTesting(editor);
+    const staleArg = provider.provideCodeLenses(document)[0].command!.arguments![0] as object;
+
+    // User now selects "bravo" and clicks the (not yet refreshed) lens
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 5));
+    await vscode.commands.executeCommand('omnicomment.addComment', { ...staleArg, content: 'On bravo' });
+
+    // Then selects "charlie" and uses the hover link args (string uri + stale text)
+    editor.selection = new vscode.Selection(new vscode.Position(2, 0), new vscode.Position(2, 7));
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: document.uri.toString(),
+      selectedText: 'alpha',
+      content: 'On charlie'
+    });
+
+    const comments = getCommentServiceForTesting().getComments(document);
+    const onBravo = comments.find(c => c.content === 'On bravo');
+    const onCharlie = comments.find(c => c.content === 'On charlie');
+    assert.ok(onBravo && onCharlie, 'Both comments must be created');
+    assert.strictEqual(onBravo!.anchor.text, 'bravo', 'Must anchor to live selection, not stale lens text');
+    assert.strictEqual(onCharlie!.anchor.text, 'charlie', 'Must anchor to live selection, not stale hover text');
+
+    // Each comment must own a distinct inline thread at its own line
+    const inline = getInlineCommentControllerForTesting();
+    assert.strictEqual(inline.getThreadCount(document.uri), 2, 'Two separate comment boxes expected');
+  });
 });

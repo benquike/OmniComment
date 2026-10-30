@@ -1753,6 +1753,25 @@ export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions 
   return result;
 }
 
+// Invariant: The live, non-empty editor selection wins; a passed range is only a fallback.
+// Why: CodeLens/hover/line-menu args are captured earlier and would reuse an old anchor,
+//      making every new selection open the same comment box.
+// Example: live "bravo" + stale range "alpha" => "bravo"; empty caret + range "alpha" => "alpha".
+export function resolveTextEditorCommentSelection(
+  editor: vscode.TextEditor,
+  fallbackRange?: vscode.Range
+): vscode.Selection {
+  const live = editor.selection;
+  if (!live.isEmpty && editor.document.getText(live).trim()) {
+    return live;
+  }
+  if (fallbackRange && !fallbackRange.isEmpty) {
+    return new vscode.Selection(fallbackRange.start, fallbackRange.end);
+  }
+  const caret = fallbackRange ? fallbackRange.start : live.active;
+  return expandSelectionAtCursor(editor.document, caret);
+}
+
 async function addCommentCommand(arg?: unknown) {
   const options = parseAddCommentArgument(arg);
 
@@ -1765,18 +1784,13 @@ async function addCommentCommand(arg?: unknown) {
   await refreshForContext(ctx.document, ctx.editor);
 
   if (ctx.editor) {
-    let selection = ctx.editor.selection;
+    const selection = resolveTextEditorCommentSelection(ctx.editor, options.targetRange);
+    ctx.editor.selection = selection;
 
-    if (options.targetRange && !options.targetRange.isEmpty) {
-      selection = new vscode.Selection(options.targetRange.start, options.targetRange.end);
-      ctx.editor.selection = selection;
-    } else if (selection.isEmpty) {
-      const targetPos = options.targetRange ? options.targetRange.start : selection.active;
-      selection = expandSelectionAtCursor(ctx.editor.document, targetPos);
-      ctx.editor.selection = selection;
-    }
-
-    const selectedText = options.selectedText || ctx.editor.document.getText(selection);
+    // Invariant: The anchor text always comes from the document at the resolved selection.
+    // Why: Lens/hover args carry text captured at render time and go stale after reselection.
+    // Example: lens built for "alpha", user selects "bravo" -> anchor "bravo".
+    const selectedText = ctx.editor.document.getText(selection);
 
     if (options.openSidebar) {
       sidebarProvider.showAddCommentForm(true, selectedText, true);
