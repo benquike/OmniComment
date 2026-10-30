@@ -394,6 +394,10 @@ function resolveBlockElement(node, contentRoot) {
   if (preEl && isEligibleBlock(preEl, contentRoot)) {
     return preEl;
   }
+  const cmLine = el.closest('.cm-line');
+  if (cmLine && isEligibleBlock(cmLine, contentRoot)) {
+    return cmLine;
+  }
   const blockEl = el.closest(
     'h1, h2, h3, h4, h5, h6, p, li, blockquote, [data-block="0"]'
   );
@@ -2016,6 +2020,9 @@ export function initOmniAnnotations(getMarkdownValue) {
     root.querySelectorAll('[data-omni-comments]').forEach(el => {
       el.removeAttribute('data-omni-comments');
     });
+    root.querySelectorAll('[data-omni-inline-highlight]').forEach(el => {
+      el.removeAttribute('data-omni-inline-highlight');
+    });
 
     commentRanges = [];
     const fallbackBlock = getFallbackBlock(contentRoot);
@@ -2055,6 +2062,22 @@ export function initOmniAnnotations(getMarkdownValue) {
               matchedSearchLen = searchNorm.length;
             }
           }
+          if (matchIdx === -1) {
+            const wrappedVariants = [
+              `**${searchNorm}**`,
+              `\`${searchNorm}\``,
+              `*${searchNorm}*`,
+              `_${searchNorm}_`,
+              `__${searchNorm}__`
+            ];
+            for (const variant of wrappedVariants) {
+              matchIdx = domMap.text.indexOf(variant);
+              if (matchIdx !== -1) {
+                matchedSearchLen = variant.length;
+                break;
+              }
+            }
+          }
         }
         if (matchIdx === -1 && rawAnchor) {
           matchIdx = normDomLower.indexOf(rawAnchor.toLowerCase());
@@ -2082,10 +2105,24 @@ export function initOmniAnnotations(getMarkdownValue) {
 
               // Only highlight text for unresolved comments; when resolved, clear highlight
               if (!comment.resolved) {
-                if (comment.id === focusedCommentId) {
+                const isFocused = comment.id === focusedCommentId;
+                if (isFocused) {
                   focusedHighlightRanges.push(range);
                 } else {
                   normalHighlightRanges.push(range);
+                }
+
+                // Invariant: Apply data-omni-inline-highlight attribute directly to enclosing inline elements (code, strong, em).
+                // Why: Guarantees visible highlighting even if ::highlight is occluded by opaque background or unsupported.
+                // Example: <code data-omni-inline-highlight="normal"> displays high-contrast yellow background + border.
+                const inlineParent =
+                  startPos.node.parentElement?.closest('code, strong, em, b, i, span') ||
+                  endPos.node.parentElement?.closest('code, strong, em, b, i, span');
+                if (inlineParent && contentRoot.contains(inlineParent)) {
+                  inlineParent.setAttribute(
+                    'data-omni-inline-highlight',
+                    isFocused ? 'focused' : 'normal'
+                  );
                 }
 
                 if (blockEl) {
@@ -2156,6 +2193,9 @@ export function initOmniAnnotations(getMarkdownValue) {
     } else {
       activeBlockCounts = new Map();
       activeGutterTargets = new Map();
+      root.querySelectorAll('[data-omni-inline-highlight]').forEach(el => {
+        el.removeAttribute('data-omni-inline-highlight');
+      });
       if (window.CSS && CSS.highlights) {
         CSS.highlights.delete('omni-comment');
         CSS.highlights.delete('omni-comment-focused');
@@ -2290,7 +2330,7 @@ export function initOmniAnnotations(getMarkdownValue) {
   if (rootEl && window.MutationObserver) {
     let modeDebounceTimer = null;
     const mo = new MutationObserver(mutations => {
-      let modeChanged = false;
+      let shouldRefresh = false;
       for (const m of mutations) {
         if (
           m.type === 'attributes' &&
@@ -2304,12 +2344,24 @@ export function initOmniAnnotations(getMarkdownValue) {
               target.classList?.contains('vditor-sv') ||
               target.id === 'vditor')
           ) {
-            modeChanged = true;
+            shouldRefresh = true;
+            break;
+          }
+        } else if (m.type === 'childList') {
+          const target = m.target;
+          if (
+            target &&
+            !zonesLayer.contains(target) &&
+            !(gutterLayer && gutterLayer.contains(target)) &&
+            target.id !== 'omni-inline-zones-layer' &&
+            target.id !== 'omni-gutter-layer'
+          ) {
+            shouldRefresh = true;
             break;
           }
         }
       }
-      if (modeChanged) {
+      if (shouldRefresh) {
         if (modeDebounceTimer) clearTimeout(modeDebounceTimer);
         modeDebounceTimer = setTimeout(() => {
           refreshHighlights();
@@ -2320,6 +2372,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     mo.observe(rootEl, {
       attributes: true,
       attributeFilter: ['class', 'style'],
+      childList: true,
       subtree: true
     });
   }

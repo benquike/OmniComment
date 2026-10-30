@@ -206,8 +206,34 @@ export class AnchorEngine {
     }
 
     if (normIndex !== -1) {
-      const origStart = toOriginalOffset(normDoc.offsets[normIndex]);
+      let origStart = toOriginalOffset(normDoc.offsets[normIndex]);
       let origEnd = toOriginalOffset(normDoc.offsets[normIndex + normQuery.length - 1] + 1);
+
+      // Invariant: Expands normalized match boundaries to encompass formatting markers if query included them.
+      // Why: Ensures symmetrical anchor coordinate recovery for bold (**), italic (*, _), and quoted (`) tokens.
+      // Example: Query "**bold**" matching normalized "bold" expands offsets to cover "**bold**".
+      if (cleanedSearch.startsWith('**') && cleanedSearch.endsWith('**')) {
+        if (origStart >= 2 && fullText.substring(origStart - 2, origStart) === '**') {
+          origStart -= 2;
+        }
+        if (origEnd + 2 <= fullText.length && fullText.substring(origEnd, origEnd + 2) === '**') {
+          origEnd += 2;
+        }
+      } else if (cleanedSearch.startsWith('`') && cleanedSearch.endsWith('`')) {
+        if (origStart >= 1 && fullText[origStart - 1] === '`') {
+          origStart -= 1;
+        }
+        if (origEnd < fullText.length && fullText[origEnd] === '`') {
+          origEnd += 1;
+        }
+      } else if (cleanedSearch.startsWith('__') && cleanedSearch.endsWith('__')) {
+        if (origStart >= 2 && fullText.substring(origStart - 2, origStart) === '__') {
+          origStart -= 2;
+        }
+        if (origEnd + 2 <= fullText.length && fullText.substring(origEnd, origEnd + 2) === '__') {
+          origEnd += 2;
+        }
+      }
 
       // Balance any open Markdown formatting delimiters (e.g. **, `, *)
       const hasUnbalancedDelimiter = (slice: string, ch: string): boolean => {

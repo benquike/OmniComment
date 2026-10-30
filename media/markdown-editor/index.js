@@ -273,10 +273,18 @@ handler.on("open", async (md) => {
           return;
         }
         omniAnnotations?.syncFromExternalUpdate?.(content);
-        if (getMarkdownValue() === content) {
+
+        // Invariant: Do not re-parse and destroy Vditor DOM if only comment metadata changed.
+        // Why: Calling setValue re-renders the document, destroying active Range highlights and gutter chips.
+        // Example: Adding a comment only appends <!-- omnicomment; body markdown remains untouched.
+        const stripComments = (md) => (md || '').replace(/<!--\s*(omnicomment|markco-comments|markco|commark-comments)[\s\S]*?-->/g, '').trim();
+        const currentClean = stripComments(getMarkdownValue());
+        const incomingClean = stripComments(content);
+        if (currentClean === incomingClean) {
           setTimeout(() => omniAnnotations?.refreshHighlights(content), 40);
           return;
         }
+
         const scrollContainer =
           document.querySelector('#vditor .vditor-wysiwyg .vditor-reset') ||
           document.querySelector('#vditor .vditor-ir .vditor-reset');
@@ -292,6 +300,9 @@ handler.on("open", async (md) => {
           }
           omniAnnotations?.refreshHighlights(content);
         }, 50);
+        setTimeout(() => {
+          omniAnnotations?.refreshHighlights(content);
+        }, 180);
       })
       const handleFocusComment = (payload) => {
         const commentId = typeof payload === 'string' ? payload : payload?.commentId;

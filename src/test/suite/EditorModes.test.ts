@@ -735,4 +735,242 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     assert.ok(actions[0].title.includes('Add OmniComment'));
     decorator.dispose();
   });
+
+  // Topology: TextEditor bold (**bold**) and quoted (`quoted`) selection -> addComment -> check getCommentRange & applyDecorations
+  // Expected: Both bold and quoted texts receive non-null decoration ranges and gutter icon.
+  test('Mode 1J: TextEditor bold and quoted comment highlighting and gutter icon', async () => {
+    const filePath = path.join(tempDir, 'formatting-test.md');
+    fs.writeFileSync(
+      filePath,
+      '# Formatting Test\n\nHere is **bold** text and `quoted` text.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    // Case 1: Select bold text with asterisks "**bold**"
+    const lineText = document.lineAt(2).text;
+    const boldWithStars = '**bold**';
+    const boldStart = lineText.indexOf(boldWithStars);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(2, boldStart),
+      new vscode.Position(2, boldStart + boldWithStars.length)
+    );
+
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: 'Comment on **bold**'
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 1;
+    });
+
+    // Reconcile anchors on document
+    await commentService.reconcileAnchors(document);
+
+    // Check decorator
+    const decorator = new CommentDecorator();
+    const comments = commentService.parseComments(document);
+    assert.strictEqual(comments.length, 1);
+    assert.strictEqual(comments[0].orphaned ?? false, false, 'Comment on **bold** must not be orphaned');
+    const range = (decorator as any).getCommentRange(document, comments[0]);
+    assert.ok(range, 'Comment range for bold text must not be null');
+
+    // Case 2: Select bold text WITHOUT asterisks "bold"
+    const boldOnly = 'bold';
+    const boldOnlyStart = lineText.indexOf(boldOnly);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(2, boldOnlyStart),
+      new vscode.Position(2, boldOnlyStart + boldOnly.length)
+    );
+
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: 'Comment on bold word only'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 2;
+    });
+
+    await commentService.reconcileAnchors(document);
+
+    const comments2 = commentService.parseComments(document);
+    assert.strictEqual(comments2[1].orphaned ?? false, false, 'Comment on bold word must not be orphaned');
+    const range2 = (decorator as any).getCommentRange(document, comments2[1]);
+    assert.ok(range2, 'Comment range for bold-only text must not be null');
+
+    // Case 3: Select quoted text with backticks "`quoted`"
+    const quotedWithTicks = '`quoted`';
+    const quotedStart = lineText.indexOf(quotedWithTicks);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(2, quotedStart),
+      new vscode.Position(2, quotedStart + quotedWithTicks.length)
+    );
+
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: 'Comment on `quoted`'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 3;
+    });
+
+    await commentService.reconcileAnchors(document);
+
+    const commentsAfter = commentService.parseComments(document);
+    assert.strictEqual(commentsAfter[2].orphaned ?? false, false, 'Comment on `quoted` must not be orphaned');
+    const quotedRange = (decorator as any).getCommentRange(document, commentsAfter[2]);
+    assert.ok(quotedRange, 'Comment range for quoted text must not be null');
+
+    // Case 4: Select quoted text WITHOUT backticks "quoted"
+    const quotedOnly = 'quoted';
+    const quotedOnlyStart = lineText.indexOf(quotedOnly);
+    editor.selection = new vscode.Selection(
+      new vscode.Position(2, quotedOnlyStart),
+      new vscode.Position(2, quotedOnlyStart + quotedOnly.length)
+    );
+
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: fileUri,
+      content: 'Comment on quoted word only'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(document);
+      return comments.length === 4;
+    });
+
+    await commentService.reconcileAnchors(document);
+
+    const comments4 = commentService.parseComments(document);
+    assert.strictEqual(comments4[3].orphaned ?? false, false, 'Comment on quoted word must not be orphaned');
+    const range4 = (decorator as any).getCommentRange(document, comments4[3]);
+    assert.ok(range4, 'Comment range for quoted-only text must not be null');
+
+    decorator.dispose();
+  });
+
+  // Topology: Custom Editor (Markdown Editor) -> add comment on bold & quoted text -> check inline state
+  // Expected: Highlight count and gutter chips exist for bold and quoted text comments.
+  test('Mode 4D: Custom Editor bold and quoted comment highlighting and gutter icon', async () => {
+    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
+    if (!officeExt) {
+      return;
+    }
+
+    const filePath = path.join(tempDir, 'mode4-formatting.md');
+    fs.writeFileSync(
+      filePath,
+      '# Formatting Doc\n\nHere is **bold** text and `quoted` text.\n',
+      'utf-8'
+    );
+    const fileUri = vscode.Uri.file(filePath);
+
+    await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
+    await waitForCondition(() => {
+      const activeTab = vscode.window.tabGroups?.activeTabGroup?.activeTab;
+      return Boolean(activeTab && activeTab.input && 'viewType' in (activeTab.input as object));
+    });
+
+    const ctx = await getActiveMarkdownContext(fileUri);
+    assert.ok(ctx);
+
+    // Add comment on "**bold**"
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: '**bold**',
+      content: 'Comment on bold with stars in custom editor'
+    });
+
+    const commentService = getCommentServiceForTesting();
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 1;
+    });
+
+    let boldState: any = null;
+    await waitForCondition(async () => {
+      boldState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(boldState && boldState.threadCount === 1);
+    }, 10000);
+
+    assert.ok(boldState);
+    assert.ok(boldState.highlightCount >= 1, `Highlight count must be at least 1, got ${boldState.highlightCount}`);
+    assert.ok(boldState.gutterChipCount >= 1, `Gutter chip count must be at least 1, got ${boldState.gutterChipCount}`);
+
+    // Add comment on "bold" (word only, as selected in WYSIWYG)
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: 'bold',
+      content: 'Comment on bold word in custom editor'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 2;
+    });
+
+    let boldWordState: any = null;
+    await waitForCondition(async () => {
+      boldWordState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(boldWordState && boldWordState.threadCount === 2);
+    }, 10000);
+
+    assert.ok(boldWordState);
+    assert.ok(boldWordState.highlightCount >= 2, `Highlight count must be at least 2, got ${boldWordState.highlightCount}`);
+
+    // Add comment on "`quoted`"
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: '`quoted`',
+      content: 'Comment on quoted with ticks in custom editor'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 3;
+    });
+
+    let quotedTicksState: any = null;
+    await waitForCondition(async () => {
+      quotedTicksState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(quotedTicksState && quotedTicksState.threadCount === 3);
+    }, 10000);
+
+    assert.ok(quotedTicksState);
+    assert.ok(quotedTicksState.highlightCount >= 3, `Highlight count must be at least 3, got ${quotedTicksState.highlightCount}`);
+
+    // Add comment on "quoted" (word only)
+    await vscode.commands.executeCommand('omnicomment.editorCommentAction', {
+      type: 'addComment',
+      uri: fileUri,
+      anchorText: 'quoted',
+      content: 'Comment on quoted word in custom editor'
+    });
+
+    await waitForCondition(() => {
+      const comments = commentService.parseComments(ctx!.document);
+      return comments.length === 4;
+    });
+
+    let quotedWordState: any = null;
+    await waitForCondition(async () => {
+      quotedWordState = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+      return Boolean(quotedWordState && quotedWordState.threadCount === 4);
+    }, 10000);
+
+    assert.ok(quotedWordState);
+    assert.ok(quotedWordState.highlightCount >= 4, `Highlight count must be at least 4, got ${quotedWordState.highlightCount}`);
+  });
 });

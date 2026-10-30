@@ -1,7 +1,68 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { AnchorEngine } from '../core/AnchorEngine';
+import { MarkdownStorageAdapter } from '../storage/MarkdownStorageAdapter';
 import { Comment, isSupportedCommentDocument } from '../types';
+
+// Invariant: Resolves delimiter-stripped plain representation for markdown formatted token comparison.
+// Why: Enables matching between raw markdown tokens (**bold**, `code`) and clean text (bold, code).
+// Example: stripMarkdownFormattingMarkers("**bold**") => "bold"
+function stripMarkdownFormattingMarkers(text: string): string {
+  return text.replace(/(\*\*|__|~~|`)/g, '').trim();
+}
+
+// Invariant: Locates comment range on current line with delimiter tolerance before falling back to full text search.
+// Why: Prevents comments on bold or quoted text from losing highlights or jumping to unrelated occurrences.
+// Example: resolveTolerantLineRange(document, 2, "**bold**", range) => Range(2:8, 2:16)
+function resolveTolerantLineRange(
+  document: vscode.TextDocument,
+  line: number,
+  anchorText: string,
+  currentRange: vscode.Range
+): vscode.Range | null {
+  const lineText = document.lineAt(line).text;
+  const cleanAnchor = stripMarkdownFormattingMarkers(anchorText);
+  const textAtRange = document.getText(currentRange);
+
+  if (stripMarkdownFormattingMarkers(textAtRange) === cleanAnchor) {
+    const rawIdx = lineText.indexOf(anchorText, Math.max(0, currentRange.start.character - 4));
+    if (rawIdx !== -1) {
+      return new vscode.Range(
+        new vscode.Position(line, rawIdx),
+        new vscode.Position(line, rawIdx + anchorText.length)
+      );
+    }
+    const cleanIdx = lineText.indexOf(cleanAnchor, Math.max(0, currentRange.start.character - 4));
+    if (cleanIdx !== -1) {
+      return new vscode.Range(
+        new vscode.Position(line, cleanIdx),
+        new vscode.Position(line, cleanIdx + cleanAnchor.length)
+      );
+    }
+    return currentRange;
+  }
+
+  // Check if anchor or clean text exists anywhere on this line
+  const directIdx = lineText.indexOf(anchorText);
+  if (directIdx !== -1) {
+    return new vscode.Range(
+      new vscode.Position(line, directIdx),
+      new vscode.Position(line, directIdx + anchorText.length)
+    );
+  }
+
+  if (cleanAnchor) {
+    const directCleanIdx = lineText.indexOf(cleanAnchor);
+    if (directCleanIdx !== -1) {
+      return new vscode.Range(
+        new vscode.Position(line, directCleanIdx),
+        new vscode.Position(line, directCleanIdx + cleanAnchor.length)
+      );
+    }
+  }
+
+  return null;
+}
 
 /**
  * Manages text decorations for comment highlights in the editor
@@ -157,23 +218,52 @@ export class CommentDecorator {
       return range;
     }
 
-    // Text doesn't match, try to find it in the document using exact index first
+    // Delimiter-tolerant recovery on the anchor line first
+    const lineTolerantRange = resolveTolerantLineRange(document, startLine, anchor.text, range);
+    if (lineTolerantRange) {
+      return lineTolerantRange;
+    }
+
+    // Text doesn't match on line, search within searchable document text excluding comment block
     const fullText = document.getText();
-    const index = fullText.indexOf(anchor.text);
+    const commentBlockLoc = MarkdownStorageAdapter.findCommentBlock(fullText);
+    const commentBlockStart = commentBlockLoc ? commentBlockLoc.index : -1;
+    const searchableText = commentBlockStart !== -1 ? fullText.substring(0, commentBlockStart) : fullText;
+
+    const index = searchableText.indexOf(anchor.text);
     if (index !== -1) {
       const foundStart = document.positionAt(index);
       const foundEnd = document.positionAt(index + anchor.text.length);
       return new vscode.Range(foundStart, foundEnd);
     }
 
+    const cleanAnchor = stripMarkdownFormattingMarkers(anchor.text);
+    if (cleanAnchor && cleanAnchor !== anchor.text) {
+      const cleanIndex = searchableText.indexOf(cleanAnchor);
+      if (cleanIndex !== -1) {
+        const foundStart = document.positionAt(cleanIndex);
+        const foundEnd = document.positionAt(cleanIndex + cleanAnchor.length);
+        return new vscode.Range(foundStart, foundEnd);
+      }
+    }
+
     // Invariant: Locates anchor range using AnchorEngine multi-tier matching when cached line coordinates drift.
     // Why: Recovers highlighting after file edits, formatting changes, or cross-editor round-trips.
     // Example: locateAnchor(fullText, "return amount * 0.15;") => Range(line 4:2 - line 4:23)
-    const match = AnchorEngine.locateAnchor(fullText, anchor.text);
+    const match = AnchorEngine.locateAnchor(fullText, anchor.text, commentBlockStart);
     if (match) {
       const foundStart = new vscode.Position(match.startLine, match.startChar);
       const foundEnd = new vscode.Position(match.endLine, match.endChar);
       return new vscode.Range(foundStart, foundEnd);
+    }
+
+    if (cleanAnchor && cleanAnchor !== anchor.text) {
+      const cleanMatch = AnchorEngine.locateAnchor(fullText, cleanAnchor, commentBlockStart);
+      if (cleanMatch) {
+        const foundStart = new vscode.Position(cleanMatch.startLine, cleanMatch.startChar);
+        const foundEnd = new vscode.Position(cleanMatch.endLine, cleanMatch.endChar);
+        return new vscode.Range(foundStart, foundEnd);
+      }
     }
 
     return null;

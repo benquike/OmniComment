@@ -1481,6 +1481,27 @@ body.vscode-high-contrast .office-read-aloud-highlight__line {
     text-decoration: underline solid rgba(255, 115, 0, 1) 2.5px;
 }
 
+/* High-contrast inline element highlights for bold, quoted code, and formatted spans */
+code[data-omni-inline-highlight="normal"],
+strong[data-omni-inline-highlight="normal"],
+em[data-omni-inline-highlight="normal"],
+span[data-omni-inline-highlight="normal"],
+[data-omni-inline-highlight="normal"] {
+    background-color: rgba(255, 212, 0, 0.42) !important;
+    outline: 2px solid rgba(230, 165, 0, 0.9) !important;
+    border-radius: 3px !important;
+}
+
+code[data-omni-inline-highlight="focused"],
+strong[data-omni-inline-highlight="focused"],
+em[data-omni-inline-highlight="focused"],
+span[data-omni-inline-highlight="focused"],
+[data-omni-inline-highlight="focused"] {
+    background-color: rgba(255, 165, 0, 0.58) !important;
+    outline: 2.5px solid rgba(255, 115, 0, 1) !important;
+    border-radius: 3px !important;
+}
+
 .omni-storage-block,
 .markco-storage-block {
     display: none !important;
