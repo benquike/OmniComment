@@ -11,6 +11,7 @@ import {
 } from './providers/InlineCommentController';
 import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
 import { SelectionCodeLensProvider } from './providers/SelectionCodeLensProvider';
+import { SelectionBadgeClickDetector } from './providers/SelectionBadgeClickDetector';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 import {
   CommentBoxConfig,
@@ -725,11 +726,17 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   handleEditorSelectionOrActiveChange(vscode.window.activeTextEditor);
+  const badgeClickDetector = new SelectionBadgeClickDetector();
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(handleEditorSelectionOrActiveChange),
-    vscode.window.onDidChangeTextEditorSelection(e =>
-      handleEditorSelectionOrActiveChange(e.textEditor)
-    )
+    vscode.window.onDidChangeTextEditorSelection(e => {
+      const clickedRange = badgeClickDetector.handle(e.textEditor.document, e.kind, e.selections);
+      if (clickedRange && isClickableSelectionBadgeEnabled()) {
+        void openCommentFromSelectionBadge(e.textEditor, clickedRange);
+        return;
+      }
+      handleEditorSelectionOrActiveChange(e.textEditor);
+    })
   );
 
   // Register commands
@@ -1679,12 +1686,37 @@ async function promptForTextEditorCommentContent(selectedText: string): Promise<
   return entered && entered.trim() ? entered.trim() : undefined;
 }
 
+// Invariant: Badge clicks are on by default and can be disabled per user.
+// Why: Detection is positional, so a plain click exactly at a selection's end also matches.
+// Example: "omnicomment.clickableSelectionBadge": false -> badge is display-only.
+function isClickableSelectionBadgeEnabled(): boolean {
+  return vscode.workspace
+    .getConfiguration('omnicomment')
+    .get<boolean>('clickableSelectionBadge', true);
+}
+
+// Invariant: Re-selects the text the badge belonged to, then opens the comment prompt for it.
+// Why: The click collapsed the selection; restoring it shows the user what is being commented.
+// Example: click "💬 Comment" after "bravo" -> "bravo" re-highlighted -> "Add comment on "bravo"".
+export async function openCommentFromSelectionBadge(
+  editor: vscode.TextEditor,
+  clickedRange: vscode.Range
+): Promise<void> {
+  editor.selection = new vscode.Selection(clickedRange.start, clickedRange.end);
+  await vscode.commands.executeCommand('omnicomment.addComment', {
+    uri: editor.document.uri,
+    range: clickedRange,
+    source: 'selectionBadge'
+  });
+}
+
 export interface ParsedAddCommentOptions {
   preferredUri?: vscode.Uri;
   selectedText?: string;
   content?: string;
   targetRange?: vscode.Range;
   openSidebar: boolean;
+  quietCancel: boolean;
 }
 
 // Invariant: Parses polymorphic arguments passed to omnicomment.addComment from menus, hover links, and gutter icons.
@@ -1692,7 +1724,8 @@ export interface ParsedAddCommentOptions {
 // Example: parseAddCommentArgument({ thread: { uri, range } }) => extracts preferredUri and targetRange.
 export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions {
   const result: ParsedAddCommentOptions = {
-    openSidebar: false
+    openSidebar: false,
+    quietCancel: false
   };
 
   if (!arg) {
@@ -1745,6 +1778,9 @@ export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions 
   }
   if (typeof obj.openSidebar === 'boolean') {
     result.openSidebar = obj.openSidebar;
+  }
+  if (obj.source === 'selectionBadge') {
+    result.quietCancel = true;
   }
   if (obj.range instanceof vscode.Range && !result.targetRange) {
     result.targetRange = obj.range;
@@ -1800,6 +1836,12 @@ async function addCommentCommand(arg?: unknown) {
     const commentBody =
       options.content || (await promptForTextEditorCommentContent(selectedText));
     if (!commentBody) {
+      // Invariant: Cancelling a badge-click prompt is silent.
+      // Why: An accidental badge match must not pop open the sidebar form.
+      // Example: click at selection end, press Escape -> nothing else happens.
+      if (options.quietCancel) {
+        return;
+      }
       sidebarProvider.showAddCommentForm(true, selectedText, false);
       return;
     }

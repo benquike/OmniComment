@@ -17,6 +17,7 @@ import {
   getSelectionCodeLensProviderForTesting
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
+import { SelectionBadgeClickDetector } from '../../providers/SelectionBadgeClickDetector';
 import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
 import { resolveCommentBoxDimensions } from '../../core/types';
 
@@ -605,5 +606,44 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     // Each comment must own a distinct inline thread at its own line
     const inline = getInlineCommentControllerForTesting();
     assert.strictEqual(inline.getThreadCount(document.uri), 2, 'Two separate comment boxes expected');
+  });
+
+  // Topology: select "bravo" -> Mouse click collapses caret to selection end (badge) -> detector -> comment
+  // Expected: Only a Mouse click exactly at the selection end counts; badge path re-selects and comments.
+  test('Txt 14: Floating "💬 Comment" badge click is detected and opens a comment on that selection', async () => {
+    const filePath = path.join(tempDir, 'badge-click.txt');
+    fs.writeFileSync(filePath, 'alpha line\nbravo line\n', 'utf-8');
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const editor = await vscode.window.showTextDocument(document);
+    const Kind = vscode.TextEditorSelectionChangeKind;
+    const sel = (l1: number, c1: number, l2: number, c2: number) =>
+      new vscode.Selection(new vscode.Position(l1, c1), new vscode.Position(l2, c2));
+
+    const detector = new SelectionBadgeClickDetector();
+    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]), undefined);
+    const clicked = detector.handle(document, Kind.Mouse, [sel(1, 5, 1, 5)]);
+    assert.ok(clicked, 'Mouse click at selection end must be detected as a badge click');
+    assert.strictEqual(document.getText(clicked!), 'bravo');
+
+    // Negative cases: inside the selection, keyboard move, elsewhere
+    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
+    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 2, 1, 2)]), undefined);
+    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
+    assert.strictEqual(detector.handle(document, Kind.Keyboard, [sel(1, 5, 1, 5)]), undefined);
+    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
+    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(0, 3, 0, 3)]), undefined);
+
+    // Badge path: caret collapsed elsewhere, badge handler restores selection and comments on it
+    editor.selection = sel(0, 0, 0, 0);
+    await vscode.commands.executeCommand('omnicomment.addComment', {
+      uri: document.uri,
+      range: clicked,
+      source: 'selectionBadge',
+      content: 'Badge comment'
+    });
+    const added = getCommentServiceForTesting().getComments(document).find(c => c.content === 'Badge comment');
+    assert.ok(added, 'Badge click must add a comment');
+    assert.strictEqual(added!.anchor.text, 'bravo');
+    assert.strictEqual(parseAddCommentArgument({ source: 'selectionBadge' }).quietCancel, true);
   });
 });

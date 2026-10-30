@@ -94,11 +94,13 @@ export class CommentDecorator {
       overviewRulerLane: vscode.OverviewRulerLane.Right,
       rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
       after: {
-        contentText: ' 💬 Ctrl+Shift+M or click "Add Comment" above',
+        contentText: '💬 Comment',
         color: '#ffffff',
         backgroundColor: '#f59e0b',
         fontWeight: 'bold',
-        margin: '0 0 0 8px'
+        margin: '0 0 0 8px',
+        // VS Code has no padding/radius fields; textDecoration is the documented CSS injection point.
+        textDecoration: 'none; padding: 0 6px; border-radius: 10px; cursor: pointer;'
       }
     });
   }
