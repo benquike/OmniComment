@@ -17,7 +17,6 @@ import {
   getSelectionCodeLensProviderForTesting
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
-import { SelectionBadgeClickDetector } from '../../providers/SelectionBadgeClickDetector';
 import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
 import { resolveCommentBoxDimensions } from '../../core/types';
 
@@ -608,48 +607,30 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     assert.strictEqual(inline.getThreadCount(document.uri), 2, 'Two separate comment boxes expected');
   });
 
-  // Topology: select "bravo" -> Mouse click collapses caret to selection end (badge) -> detector -> comment
-  // Expected: Only a Mouse click exactly at the selection end counts; badge path re-selects and comments.
-  test('Txt 14: Floating "💬 Comment" badge click is detected and opens a comment on that selection', async () => {
-    const filePath = path.join(tempDir, 'badge-click.txt');
+  // Topology: select text in .txt -> selection decoration -> gutter icon only (no inline badge)
+  // Expected: Selection decoration has no `after` text badge; gutter decoration is still applied.
+  test('Txt 14: Selection shows no inline yellow "💬 Add Comment" badge, gutter icon remains', async () => {
+    const compiled = fs.readFileSync(
+      path.join(__dirname, '../../decorators/CommentDecorator.js'),
+      'utf-8'
+    );
+    assert.ok(!/contentText:\s*['"`][^'"`]*💬/.test(compiled), 'No inline 💬 badge text may be rendered');
+    assert.ok(!compiled.includes('Add Comment (Ctrl+Shift+M)'), 'Old yellow badge text must be gone');
+
+    const filePath = path.join(tempDir, 'no-badge.txt');
     fs.writeFileSync(filePath, 'alpha line\nbravo line\n', 'utf-8');
     const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
     const editor = await vscode.window.showTextDocument(document);
-    const Kind = vscode.TextEditorSelectionChangeKind;
-    const sel = (l1: number, c1: number, l2: number, c2: number) =>
-      new vscode.Selection(new vscode.Position(l1, c1), new vscode.Position(l2, c2));
-
-    const detector = new SelectionBadgeClickDetector();
-    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]), undefined);
-    const clicked = detector.handle(document, Kind.Mouse, [sel(1, 5, 1, 5)]);
-    assert.ok(clicked, 'Mouse click at selection end must be detected as a badge click');
-    assert.strictEqual(document.getText(clicked!), 'bravo');
-
-    // Right half of the pill lands one column past the end (measured with real mouse clicks)
-    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
-    assert.ok(detector.handle(document, Kind.Mouse, [sel(1, 6, 1, 6)]), 'end+1 must count as a badge click');
-    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
-    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 7, 1, 7)]), undefined, 'end+2 is real text');
-
-    // Negative cases: inside the selection, keyboard move, elsewhere
-    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
-    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 2, 1, 2)]), undefined);
-    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
-    assert.strictEqual(detector.handle(document, Kind.Keyboard, [sel(1, 5, 1, 5)]), undefined);
-    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
-    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(0, 3, 0, 3)]), undefined);
-
-    // Badge path: caret collapsed elsewhere, badge handler restores selection and comments on it
-    editor.selection = sel(0, 0, 0, 0);
-    await vscode.commands.executeCommand('omnicomment.addComment', {
-      uri: document.uri,
-      range: clicked,
-      source: 'selectionBadge',
-      content: 'Badge comment'
-    });
-    const added = getCommentServiceForTesting().getComments(document).find(c => c.content === 'Badge comment');
-    assert.ok(added, 'Badge click must add a comment');
-    assert.strictEqual(added!.anchor.text, 'bravo');
-    assert.strictEqual(parseAddCommentArgument({ source: 'selectionBadge' }).quietCancel, true);
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 5));
+    const applied: vscode.DecorationOptions[][] = [];
+    const spyEditor = {
+      document,
+      selection: editor.selection,
+      setDecorations: (_t: unknown, opts: vscode.DecorationOptions[]) => applied.push(opts)
+    } as unknown as vscode.TextEditor;
+    getCommentDecoratorForTesting().updateSelectionDecoration(spyEditor);
+    assert.strictEqual(applied.length, 1);
+    assert.strictEqual(applied[0].length, 1, 'Gutter selection decoration must still be applied');
+    assert.strictEqual(applied[0][0].range.start.line, 1);
   });
 });

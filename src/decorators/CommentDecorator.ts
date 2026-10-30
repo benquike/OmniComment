@@ -85,23 +85,16 @@ export class CommentDecorator {
     this.decorationType = this.createDecorationType(false);
     this.focusedDecorationType = this.createDecorationType(true);
 
+    // Invariant: Selection feedback is gutter icon + overview-ruler mark only; no inline text badge.
+    // Why: An inline `after` badge shifts the line's text and cannot receive clicks in VS Code.
+    // Example: select "review" -> 💬 in the gutter, orange mark in the scrollbar, text unchanged.
     this.selectionGutterDecorationType = vscode.window.createTextEditorDecorationType({
       gutterIconPath: this.gutterIconUri,
       gutterIconSize: 'contain',
-      cursor: 'pointer',
       isWholeLine: false,
       overviewRulerColor: '#f59e0b',
       overviewRulerLane: vscode.OverviewRulerLane.Right,
-      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-      after: {
-        contentText: '💬 Comment',
-        color: '#ffffff',
-        backgroundColor: '#f59e0b',
-        fontWeight: 'bold',
-        margin: '0 0 0 8px',
-        // VS Code has no padding/radius fields; textDecoration is the documented CSS injection point.
-        textDecoration: 'none; padding: 0 6px; border-radius: 10px; cursor: pointer;'
-      }
+      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
     });
   }
 

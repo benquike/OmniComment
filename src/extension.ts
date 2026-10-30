@@ -11,7 +11,6 @@ import {
 } from './providers/InlineCommentController';
 import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
 import { SelectionCodeLensProvider } from './providers/SelectionCodeLensProvider';
-import { SelectionBadgeClickDetector } from './providers/SelectionBadgeClickDetector';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 import {
   CommentBoxConfig,
@@ -726,32 +725,14 @@ export function activate(context: vscode.ExtensionContext) {
   };
 
   handleEditorSelectionOrActiveChange(vscode.window.activeTextEditor);
-  const badgeClickDetector = new SelectionBadgeClickDetector();
-  // Invariant: Seed the badge anchor from a selection that existed before any selection event.
-  // Why: Activation or tab switches can show the badge without a prior selection-change event.
-  // Example: text already selected when the extension activates -> first badge click still works.
-  const primeBadgeDetector = (editor?: vscode.TextEditor): void => {
-    if (editor) {
-      badgeClickDetector.handle(editor.document, undefined, editor.selections);
-    }
-  };
-  primeBadgeDetector(vscode.window.activeTextEditor);
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(editor => {
-      primeBadgeDetector(editor);
-      handleEditorSelectionOrActiveChange(editor);
-    }),
+    vscode.window.onDidChangeActiveTextEditor(handleEditorSelectionOrActiveChange),
     vscode.window.onDidChangeTextEditorSelection(e => {
-      const clickedRange = badgeClickDetector.handle(e.textEditor.document, e.kind, e.selections);
       writeDebugLog(
         `selection kind=${e.kind} sel=${e.selections
           .map(s => `${s.anchor.line}:${s.anchor.character}->${s.active.line}:${s.active.character}`)
-          .join(',')} badgeClick=${clickedRange ? 'yes' : 'no'}`
+          .join(',')}`
       );
-      if (clickedRange && isClickableSelectionBadgeEnabled()) {
-        void openCommentFromSelectionBadge(e.textEditor, clickedRange);
-        return;
-      }
       handleEditorSelectionOrActiveChange(e.textEditor);
     })
   );
@@ -1705,7 +1686,7 @@ async function promptForTextEditorCommentContent(selectedText: string): Promise<
 
 // Invariant: Appends a line to $OMNICOMMENT_DEBUG_LOG only when that variable is set.
 // Why: Real mouse interactions cannot be observed from tests; this records what VS Code reports.
-// Example: OMNICOMMENT_DEBUG_LOG=/tmp/oc.log -> "selection kind=2 sel=1:0->1:5 badgeClick=no".
+// Example: OMNICOMMENT_DEBUG_LOG=/tmp/oc.log -> "selection kind=2 sel=1:0->1:5".
 function writeDebugLog(message: string): void {
   const logPath = process.env.OMNICOMMENT_DEBUG_LOG;
   if (!logPath) {
@@ -1718,38 +1699,12 @@ function writeDebugLog(message: string): void {
   }
 }
 
-// Invariant: Badge clicks are on by default and can be disabled per user.
-// Why: Detection is positional, so a plain click exactly at a selection's end also matches.
-// Example: "omnicomment.clickableSelectionBadge": false -> badge is display-only.
-function isClickableSelectionBadgeEnabled(): boolean {
-  return vscode.workspace
-    .getConfiguration('omnicomment')
-    .get<boolean>('clickableSelectionBadge', true);
-}
-
-// Invariant: Re-selects the text the badge belonged to, then opens the comment prompt for it.
-// Why: The click collapsed the selection; restoring it shows the user what is being commented.
-// Example: click "💬 Comment" after "bravo" -> "bravo" re-highlighted -> "Add comment on "bravo"".
-export async function openCommentFromSelectionBadge(
-  editor: vscode.TextEditor,
-  clickedRange: vscode.Range
-): Promise<void> {
-  writeDebugLog(`badge click -> addComment ${clickedRange.start.line}:${clickedRange.start.character}`);
-  editor.selection = new vscode.Selection(clickedRange.start, clickedRange.end);
-  await vscode.commands.executeCommand('omnicomment.addComment', {
-    uri: editor.document.uri,
-    range: clickedRange,
-    source: 'selectionBadge'
-  });
-}
-
 export interface ParsedAddCommentOptions {
   preferredUri?: vscode.Uri;
   selectedText?: string;
   content?: string;
   targetRange?: vscode.Range;
   openSidebar: boolean;
-  quietCancel: boolean;
 }
 
 // Invariant: Parses polymorphic arguments passed to omnicomment.addComment from menus, hover links, and gutter icons.
@@ -1757,8 +1712,7 @@ export interface ParsedAddCommentOptions {
 // Example: parseAddCommentArgument({ thread: { uri, range } }) => extracts preferredUri and targetRange.
 export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions {
   const result: ParsedAddCommentOptions = {
-    openSidebar: false,
-    quietCancel: false
+    openSidebar: false
   };
 
   if (!arg) {
@@ -1811,9 +1765,6 @@ export function parseAddCommentArgument(arg?: unknown): ParsedAddCommentOptions 
   }
   if (typeof obj.openSidebar === 'boolean') {
     result.openSidebar = obj.openSidebar;
-  }
-  if (obj.source === 'selectionBadge') {
-    result.quietCancel = true;
   }
   if (obj.range instanceof vscode.Range && !result.targetRange) {
     result.targetRange = obj.range;
@@ -1869,12 +1820,6 @@ async function addCommentCommand(arg?: unknown) {
     const commentBody =
       options.content || (await promptForTextEditorCommentContent(selectedText));
     if (!commentBody) {
-      // Invariant: Cancelling a badge-click prompt is silent.
-      // Why: An accidental badge match must not pop open the sidebar form.
-      // Example: click at selection end, press Escape -> nothing else happens.
-      if (options.quietCancel) {
-        return;
-      }
       sidebarProvider.showAddCommentForm(true, selectedText, false);
       return;
     }
