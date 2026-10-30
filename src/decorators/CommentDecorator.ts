@@ -94,7 +94,7 @@ export class CommentDecorator {
       overviewRulerLane: vscode.OverviewRulerLane.Right,
       rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
       after: {
-        contentText: ' 💬 Add Comment (Ctrl+Shift+M)',
+        contentText: ' 💬 Ctrl+Shift+M or click "Add Comment" above',
         color: '#ffffff',
         backgroundColor: '#f59e0b',
         fontWeight: 'bold',

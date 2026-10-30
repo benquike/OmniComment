@@ -13,7 +13,8 @@ import {
   saveCommentBoxConfigHandler,
   resolveAnchorSelectionForThread,
   parseAddCommentArgument,
-  ensureGlyphMarginForDocument
+  ensureGlyphMarginForDocument,
+  getSelectionCodeLensProviderForTesting
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
 import { OmniCommentInlineItem } from '../../providers/InlineCommentController';
@@ -529,5 +530,42 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     const parsedHover = parseAddCommentArgument(hoverArg);
     assert.strictEqual(parsedHover.preferredUri?.path, '/tmp/notes.txt');
     assert.strictEqual(parsedHover.selectedText, 'Highlighted text');
+
+    // Case 4: Hover command link JSON-encodes the Uri as a string
+    const parsedStringUri = parseAddCommentArgument({ uri: 'file:///tmp/notes.txt' });
+    assert.strictEqual(parsedStringUri.preferredUri?.path, '/tmp/notes.txt');
+  });
+
+  // Topology: select text in .txt -> SelectionCodeLensProvider lens -> click (selection already collapsed) -> addComment
+  // Expected: Lens exists on selection line; executing its command anchors the comment to the lens range.
+  test('Txt 12: Clickable selection CodeLens adds a comment in .txt mode', async () => {
+    const filePath = path.join(tempDir, 'lens-click.txt');
+    fs.writeFileSync(filePath, 'Header line\nPlease review this sentence\nFooter\n', 'utf-8');
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const editor = await vscode.window.showTextDocument(document);
+    editor.selection = new vscode.Selection(new vscode.Position(1, 7), new vscode.Position(1, 13));
+
+    const provider = getSelectionCodeLensProviderForTesting();
+    provider.setTargetForTesting(editor);
+    const lenses = provider.provideCodeLenses(document);
+    assert.strictEqual(lenses.length, 1, 'One clickable lens must appear above the selection');
+    assert.strictEqual(lenses[0].range.start.line, 1);
+    const lensCommand = lenses[0].command!;
+    assert.strictEqual(lensCommand.command, 'omnicomment.addComment');
+    assert.ok(lensCommand.title.includes('review'));
+
+    // Simulate the click moving the caret away before the command runs
+    editor.selection = new vscode.Selection(new vscode.Position(0, 0), new vscode.Position(0, 0));
+    const lensArg = { ...(lensCommand.arguments![0] as object), content: 'Lens click comment' };
+    await vscode.commands.executeCommand(lensCommand.command, lensArg);
+
+    const comments = getCommentServiceForTesting().getComments(document);
+    const added = comments.find(c => c.content === 'Lens click comment');
+    assert.ok(added, 'Clicking the lens must add a comment');
+    assert.strictEqual(added!.anchor.text, 'review');
+
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 0));
+    provider.setTargetForTesting(editor);
+    assert.strictEqual(provider.provideCodeLenses(document).length, 0, 'Lens must vanish on deselect');
   });
 });

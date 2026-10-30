@@ -10,6 +10,7 @@ import {
   OmniCommentInlineItem
 } from './providers/InlineCommentController';
 import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider';
+import { SelectionCodeLensProvider } from './providers/SelectionCodeLensProvider';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 import {
   CommentBoxConfig,
@@ -25,6 +26,7 @@ let commentService: CommentService;
 let commentDecorator: CommentDecorator;
 let sidebarProvider: CommentSidebarProvider;
 let inlineCommentController: InlineCommentController;
+let selectionCodeLensProvider: SelectionCodeLensProvider;
 let lastActiveMarkdownUri: vscode.Uri | undefined;
 let pendingInlineStateResolver: ((state: any) => void) | undefined;
 let isTestMode = false;
@@ -149,6 +151,16 @@ export function isMarkdownCompatibleUri(uri: vscode.Uri): boolean {
 }
 
 function toVscodeUri(candidate: unknown): vscode.Uri | undefined {
+  // Invariant: Accept serialized URI strings (e.g. "file:///tmp/notes.txt").
+  // Why: Hover markdown command links JSON-encode their args, so the Uri arrives as a string.
+  // Example: toVscodeUri('file:///tmp/a.txt') => Uri(file, /tmp/a.txt).
+  if (typeof candidate === 'string' && /^[a-z][\w+.-]*:/i.test(candidate)) {
+    try {
+      return vscode.Uri.parse(candidate, true);
+    } catch {
+      return undefined;
+    }
+  }
   if (!candidate || typeof candidate !== 'object') {
     return undefined;
   }
@@ -691,12 +703,25 @@ export function activate(context: vscode.ExtensionContext) {
     commentStatusBarItem.show();
   };
 
+  // Invariant: A clickable CodeLens tracks the active selection in every supported TextEditor.
+  // Why: Decoration gutter icons cannot receive clicks in VS Code; the lens is the clickable twin.
+  // Example: select text in notes.txt -> "💬 Add Comment on ..." lens -> click -> comment prompt.
+  selectionCodeLensProvider = new SelectionCodeLensProvider();
+  context.subscriptions.push(
+    selectionCodeLensProvider,
+    vscode.languages.registerCodeLensProvider(
+      [{ scheme: 'file' }, { scheme: 'untitled' }, { scheme: 'vscode-vfs' }],
+      selectionCodeLensProvider
+    )
+  );
+
   const handleEditorSelectionOrActiveChange = (editor?: vscode.TextEditor): void => {
     if (editor?.document) {
       ensureGlyphMarginForDocument(editor.document);
     }
     updateStatusBar(editor);
     commentDecorator.updateSelectionDecoration(editor);
+    selectionCodeLensProvider.onSelectionChanged(editor);
   };
 
   handleEditorSelectionOrActiveChange(vscode.window.activeTextEditor);
@@ -1904,6 +1929,10 @@ export function getInlineCommentControllerForTesting(): InlineCommentController 
 // Example: getCommentDecoratorForTesting().updateSelectionDecoration(editor);
 export function getCommentDecoratorForTesting(): CommentDecorator {
   return commentDecorator;
+}
+
+export function getSelectionCodeLensProviderForTesting(): SelectionCodeLensProvider {
+  return selectionCodeLensProvider;
 }
 
 export async function queryMarkdownEditorInlineStateForTesting(
