@@ -356,6 +356,30 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
       decorator.updateSelectionDecoration(editor);
     });
 
+    // Invariant: Verify code action provider supplies gutter/margin lightbulb action on selection
+    const codeActions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+      'vscode.executeCodeActionProvider',
+      document.uri,
+      editor.selection
+    );
+    assert.ok(codeActions && codeActions.length >= 1, 'CodeAction must be available on text selection in .txt editor');
+    const commentAction = codeActions.find(a => a.title.includes('Add OmniComment'));
+    assert.ok(commentAction, 'Must supply Add OmniComment code action on text selection');
+
+    // Invariant: Verify configurationDefaults enable glyph margin for text modes so gutter icons are visible
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf-8')
+    );
+    assert.strictEqual(pkg.contributes.configurationDefaults['[plaintext]']['editor.glyphMargin'], true);
+    assert.strictEqual(pkg.contributes.configurationDefaults['[markdown]']['editor.glyphMargin'], true);
+    assert.strictEqual(pkg.contributes.configurationDefaults['[log]']['editor.glyphMargin'], true);
+    assert.ok(
+      pkg.contributes.menus['editor/lineNumber/context'].some(
+        (m: { command: string }) => m.command === 'omnicomment.addComment'
+      ),
+      'Must contribute editor/lineNumber/context menu for gutter right-click'
+    );
+
     // Clear selection
     editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 0));
     assert.doesNotThrow(() => {

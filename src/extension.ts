@@ -662,7 +662,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(commentStatusBarItem);
 
   const updateStatusBar = (editor?: vscode.TextEditor): void => {
-    if (!editor || !isMarkdownCompatibleLanguage(editor.document.languageId)) {
+    if (!editor || (!isMarkdownCompatibleLanguage(editor.document.languageId) && !isMarkdownCompatibleUri(editor.document.uri))) {
       commentStatusBarItem.hide();
       return;
     }

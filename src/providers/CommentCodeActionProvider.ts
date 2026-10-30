@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { isSupportedCommentDocument } from '../types';
 
 // Invariant: Checks whether the given document language is supported for in-editor comments.
 // Why: Restricts OmniComment quick actions to Markdown, SKILL, and Plain Text files.
@@ -28,7 +29,7 @@ export class CommentCodeActionProvider implements vscode.CodeActionProvider {
     context: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): vscode.CodeAction[] {
-    if (!isSupportedDocumentLanguage(document.languageId)) {
+    if (!isSupportedCommentDocument(document)) {
       return [];
     }
 

@@ -132,4 +132,5 @@ export type SidebarMessage =
   | { type: 'setCommentBoxConfig'; config: import('./commentBoxConfig').CommentBoxConfig };
 
 export * from './commentBoxConfig';
+export * from './documentUtils';
 

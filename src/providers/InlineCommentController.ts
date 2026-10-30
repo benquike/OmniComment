@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Comment, Reply } from '../types';
+import { Comment, Reply, isSupportedCommentDocument } from '../types';
 import { MarkdownStorageAdapter } from '../storage/MarkdownStorageAdapter';
 
 export class OmniCommentInlineItem implements vscode.Comment {
@@ -64,25 +64,7 @@ export class InlineCommentController implements vscode.Disposable {
 
     this._controller.commentingRangeProvider = {
       provideCommentingRanges: (document: vscode.TextDocument) => {
-        const isSupportedLang =
-          document.languageId === 'markdown' ||
-          document.languageId === 'skill' ||
-          document.languageId === 'plaintext' ||
-          document.languageId === 'text' ||
-          document.languageId === 'log';
-        const lowerPath = document.uri.path.toLowerCase();
-        const isSupportedFile = [
-          '.md',
-          '.markdown',
-          '.mdown',
-          '.mkdn',
-          '.mkd',
-          '.skill',
-          '.txt',
-          '.text',
-          '.log'
-        ].some(ext => lowerPath.endsWith(ext));
-        if (!isSupportedLang && !isSupportedFile) {
+        if (!isSupportedCommentDocument(document)) {
           return [];
         }
         // Invariant: The comment storage block at the bottom of the document should not be commented on.

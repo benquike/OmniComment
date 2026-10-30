@@ -1,5 +1,6 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { Comment } from '../types';
+import { Comment, isSupportedCommentDocument } from '../types';
 
 /**
  * Manages text decorations for comment highlights in the editor
@@ -14,13 +15,29 @@ export class CommentDecorator {
   constructor(extensionUri?: vscode.Uri) {
     if (extensionUri) {
       this.gutterIconUri = vscode.Uri.joinPath(extensionUri, 'media', 'comment-gutter.svg');
+    } else {
+      this.gutterIconUri = vscode.Uri.file(
+        path.join(__dirname, '..', '..', 'media', 'comment-gutter.svg')
+      );
     }
     this.decorationType = this.createDecorationType(false);
     this.focusedDecorationType = this.createDecorationType(true);
+
+    const iconPath =
+      this.gutterIconUri?.scheme === 'file'
+        ? this.gutterIconUri.fsPath
+        : this.gutterIconUri;
+
     this.selectionGutterDecorationType = vscode.window.createTextEditorDecorationType({
-      gutterIconPath: this.gutterIconUri,
+      gutterIconPath: iconPath,
       gutterIconSize: 'contain',
-      cursor: 'pointer'
+      cursor: 'pointer',
+      after: {
+        contentText: ' 💬',
+        color: '#f59e0b',
+        fontWeight: 'bold',
+        margin: '0 0 0 6px'
+      }
     });
   }
 
@@ -179,12 +196,18 @@ export class CommentDecorator {
     }
   }
 
-  // Invariant: Displays the comment bubble gutter icon on the active selection line.
-  // Why: Gives an immediate visual indicator in the line number gutter when text is selected.
-  // Example: User highlights text on line 12 -> line 12 gutter shows comment bubble.
+  // Invariant: Displays the comment bubble gutter icon and inline badge on the active selection.
+  // Why: Gives an immediate visual indicator in the line gutter and at cursor when text is selected.
+  // Example: User highlights text on line 12 -> line 12 gutter shows comment bubble and inline 💬.
   updateSelectionDecoration(editor?: vscode.TextEditor): void {
     if (!editor) {
       return;
+    }
+    if (editor.document && (editor.document.languageId || editor.document.uri)) {
+      if (!isSupportedCommentDocument(editor.document)) {
+        editor.setDecorations(this.selectionGutterDecorationType, []);
+        return;
+      }
     }
     if (editor.selection.isEmpty) {
       editor.setDecorations(this.selectionGutterDecorationType, []);
@@ -204,12 +227,9 @@ export class CommentDecorator {
     );
     hoverMd.isTrusted = true;
 
-    const startLine = editor.selection.start.line;
-    const targetRange = new vscode.Range(startLine, 0, startLine, 0);
-
     editor.setDecorations(this.selectionGutterDecorationType, [
       {
-        range: targetRange,
+        range: editor.selection,
         hoverMessage: hoverMd
       }
     ]);

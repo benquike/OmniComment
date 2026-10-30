@@ -35,6 +35,23 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configurationDefaults": {
+      "[markdown]": {
+        "editor.glyphMargin": true
+      },
+      "[plaintext]": {
+        "editor.glyphMargin": true
+      },
+      "[text]": {
+        "editor.glyphMargin": true
+      },
+      "[log]": {
+        "editor.glyphMargin": true
+      },
+      "[skill]": {
+        "editor.glyphMargin": true
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -159,6 +176,13 @@
       }
     ],
     "menus": {
+      "editor/lineNumber/context": [
+        {
+          "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
+          "command": "omnicomment.addComment",
+          "group": "navigation@1"
+        }
+      ],
       "editor/context": [
         {
           "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",
