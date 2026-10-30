@@ -13,6 +13,11 @@ import {
 } from '../../extension';
 import { CommentCodeActionProvider } from '../../providers/CommentCodeActionProvider';
 import { CommentDecorator } from '../../decorators/CommentDecorator';
+import {
+  isSupportedCommentDocument,
+  isSupportedCommentLanguage,
+  isSupportedCommentUri
+} from '../../core/types';
 
 const suite = Mocha.suite;
 const test = Mocha.test;
@@ -692,5 +697,42 @@ suite('Multi-Editor Modes Comprehensive Test Suite', () => {
     const resolved = resolveAnchorSelectionForThread(document, blankRange);
     const resolvedText = document.getText(resolved).trim();
     assert.strictEqual(resolvedText, 'Target content line.');
+  });
+
+  // Topology: Text selection in log file -> updateSelectionDecoration + provideCodeActions
+  // Expected: Universal support allows commenting and presents gutter decorations and code actions.
+  test('Mode 1I: Universal text file commenting and code action support across languages', async () => {
+    const filePath = path.join(tempDir, 'test-output.log');
+    fs.writeFileSync(filePath, '2026-10-30 ERROR worker failed: timeout connecting to service\n', 'utf-8');
+    const fileUri = vscode.Uri.file(filePath);
+    const document = await vscode.workspace.openTextDocument(fileUri);
+    const editor = await vscode.window.showTextDocument(document);
+
+    assert.strictEqual(isSupportedCommentDocument(document), true);
+    assert.strictEqual(isSupportedCommentLanguage('log'), true);
+    assert.strictEqual(isSupportedCommentUri(fileUri), true);
+
+    const targetTerm = 'timeout connecting to service';
+    const startIdx = document.lineAt(0).text.indexOf(targetTerm);
+    const selection = new vscode.Selection(
+      new vscode.Position(0, startIdx),
+      new vscode.Position(0, startIdx + targetTerm.length)
+    );
+    editor.selection = selection;
+
+    const decorator = new CommentDecorator();
+    decorator.updateSelectionDecoration(editor);
+
+    const provider = new CommentCodeActionProvider();
+    const actions = provider.provideCodeActions(
+      document,
+      selection,
+      { diagnostics: [], triggerKind: vscode.CodeActionTriggerKind.Invoke, only: undefined },
+      new vscode.CancellationTokenSource().token
+    );
+
+    assert.ok(actions.length > 0);
+    assert.ok(actions[0].title.includes('Add OmniComment'));
+    decorator.dispose();
   });
 });

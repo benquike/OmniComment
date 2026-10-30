@@ -34,10 +34,11 @@ export class CommentDecorator {
       gutterIconSize: 'contain',
       cursor: 'pointer',
       after: {
-        contentText: ' 💬',
-        color: '#f59e0b',
+        contentText: ' 💬 Add Comment (Ctrl+Shift+M)',
+        color: '#ffffff',
+        backgroundColor: '#f59e0b',
         fontWeight: 'bold',
-        margin: '0 0 0 6px'
+        margin: '0 0 0 8px'
       }
     });
   }
@@ -233,7 +234,7 @@ export class CommentDecorator {
 
     const preview = selectedText.length > 30 ? `${selectedText.slice(0, 27)}...` : selectedText;
     const hoverMd = new vscode.MarkdownString(
-      `💬 **OmniComment**: Add comment on "${preview}"\n\n[$(comment) Add Comment](command:omnicomment.addComment)`,
+      `💬 **OmniComment**: Add comment on "${preview}"\n\n[$(comment) **Click to Add Comment**](command:omnicomment.addComment) *(Ctrl+Shift+M)*`,
       true
     );
     hoverMd.isTrusted = true;

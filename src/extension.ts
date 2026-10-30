@@ -15,7 +15,10 @@ import {
   CommentBoxConfig,
   CommentBoxWidthMode,
   DEFAULT_COMMENT_BOX_CONFIG,
-  resolveCommentBoxDimensions
+  resolveCommentBoxDimensions,
+  isSupportedCommentDocument,
+  isSupportedCommentLanguage,
+  isSupportedCommentUri
 } from './core/types';
 
 let commentService: CommentService;
@@ -131,22 +134,18 @@ const MARKDOWN_EXTENSIONS = [
   '.log'
 ];
 
+// Invariant: Checks whether the given language ID is supported for commenting.
+// Why: Delegates to universal documentUtils to enable commenting across all supported languages.
+// Example: isMarkdownCompatibleLanguage('plaintext') => true, isMarkdownCompatibleLanguage('python') => true.
 export function isMarkdownCompatibleLanguage(languageId: string): boolean {
-  return (
-    languageId === 'markdown' ||
-    languageId === 'skill' ||
-    languageId === 'plaintext' ||
-    languageId === 'text' ||
-    languageId === 'log'
-  );
+  return isSupportedCommentLanguage(languageId);
 }
 
+// Invariant: Checks whether the given URI is eligible for commenting.
+// Why: Delegates to universal documentUtils scheme verification for workspace and virtual files.
+// Example: isMarkdownCompatibleUri(vscode.Uri.file('/tmp/app.log')) => true.
 export function isMarkdownCompatibleUri(uri: vscode.Uri): boolean {
-  if (uri.scheme !== 'file' && uri.scheme !== 'untitled' && uri.scheme !== 'vscode-vfs') {
-    return false;
-  }
-  const lowerPath = uri.path.toLowerCase();
-  return MARKDOWN_EXTENSIONS.some(ext => lowerPath.endsWith(ext));
+  return isSupportedCommentUri(uri);
 }
 
 function toVscodeUri(candidate: unknown): vscode.Uri | undefined {
@@ -359,6 +358,18 @@ async function saveDocumentIfCustomEditor(ctx: {
 export function activate(context: vscode.ExtensionContext) {
   isTestMode = context.extensionMode === vscode.ExtensionMode.Test;
   console.log('OmniComment extension is now active');
+
+  // Invariant: Ensure editor.glyphMargin is globally active so gutter comment icons never collapse.
+  // Why: Gutter icons require glyph margin width > 0 to be rendered in standard text editors.
+  // Example: glyphMargin=false -> collapsed gutter (invisible); glyphMargin=true -> visible gutter icon.
+  try {
+    const editorConfig = vscode.workspace.getConfiguration('editor');
+    if (!editorConfig.get<boolean>('glyphMargin')) {
+      editorConfig.update('glyphMargin', true, vscode.ConfigurationTarget.Global);
+    }
+  } catch {
+    // Non-critical if settings update is denied in test sandbox
+  }
 
   syncMarkdownEditorIntegration(context.extensionPath);
 
@@ -635,14 +646,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Example: Selecting "heading" displays lightbulb "💬 Add OmniComment on \"heading\"".
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
-      [
-        { language: 'markdown' },
-        { language: 'skill' },
-        { language: 'plaintext' },
-        { language: 'text' },
-        { language: 'log' },
-        { pattern: '**/*.{txt,text,md,markdown,skill,log}' }
-      ],
+      [{ scheme: 'file' }, { scheme: 'untitled' }, { scheme: 'vscode-vfs' }],
       new CommentCodeActionProvider(),
       {
         providedCodeActionKinds: CommentCodeActionProvider.providedCodeActionKinds
@@ -662,17 +666,21 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(commentStatusBarItem);
 
   const updateStatusBar = (editor?: vscode.TextEditor): void => {
-    if (!editor || (!isMarkdownCompatibleLanguage(editor.document.languageId) && !isMarkdownCompatibleUri(editor.document.uri))) {
+    if (!editor || !isSupportedCommentDocument(editor.document)) {
       commentStatusBarItem.hide();
       return;
     }
     const hasSelection = !editor.selection.isEmpty;
-    commentStatusBarItem.text = hasSelection
-      ? '$(comment) Add Comment'
-      : '$(comment) OmniComment';
-    commentStatusBarItem.tooltip = hasSelection
-      ? `Add OmniComment on "${editor.document.getText(editor.selection).slice(0, 30)}..." (Ctrl+Shift+M)`
-      : 'Add OmniComment at cursor (Ctrl+Shift+M)';
+    if (hasSelection) {
+      const selectedSnippet = editor.document.getText(editor.selection).slice(0, 30);
+      commentStatusBarItem.text = '$(comment) Add Comment';
+      commentStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      commentStatusBarItem.tooltip = `Add OmniComment on "${selectedSnippet}..." (Ctrl+Shift+M)`;
+    } else {
+      commentStatusBarItem.text = '$(comment) OmniComment';
+      commentStatusBarItem.backgroundColor = undefined;
+      commentStatusBarItem.tooltip = 'Add OmniComment at cursor (Ctrl+Shift+M)';
+    }
     commentStatusBarItem.show();
   };
 
@@ -1669,7 +1677,7 @@ async function addCommentCommand(arg?: unknown) {
 
   const ctx = await getActiveMarkdownContext(preferredUri);
   if (!ctx) {
-    vscode.window.showErrorMessage('Please open a Markdown, text, or SKILL file to add comments');
+    vscode.window.showErrorMessage('Please open an active document to add comments');
     return;
   }
 

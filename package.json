@@ -2,7 +2,7 @@
   "name": "omnicomment",
   "displayName": "OmniComment - Universal Comments & Annotations",
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
-  "version": "0.1.8",
+  "version": "0.1.16",
   "license": "MIT",
   "publisher": "benquike",
   "repository": {
@@ -36,6 +36,7 @@
   "main": "./out/extension.js",
   "contributes": {
     "configurationDefaults": {
+      "editor.glyphMargin": true,
       "[markdown]": {
         "editor.glyphMargin": true
       },
@@ -176,6 +177,12 @@
       }
     ],
     "menus": {
+      "comments/commentingRange/context": [
+        {
+          "command": "omnicomment.addComment",
+          "group": "inline@1"
+        }
+      ],
       "editor/lineNumber/context": [
         {
           "when": "editorLangId == markdown || editorLangId == skill || editorLangId == plaintext || editorLangId == text || editorLangId == log || resourceExtname == .md || resourceExtname == .markdown || resourceExtname == .skill || resourceExtname == .txt || resourceExtname == .text || resourceExtname == .log",

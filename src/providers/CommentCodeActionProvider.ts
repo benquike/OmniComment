@@ -1,17 +1,11 @@
 import * as vscode from 'vscode';
-import { isSupportedCommentDocument } from '../types';
+import { isSupportedCommentDocument, isSupportedCommentLanguage } from '../types';
 
 // Invariant: Checks whether the given document language is supported for in-editor comments.
-// Why: Restricts OmniComment quick actions to Markdown, SKILL, and Plain Text files.
-// Example: isSupportedDocumentLanguage('plaintext') => true, isSupportedDocumentLanguage('python') => false.
+// Why: Allows OmniComment quick actions across all editable text and code files.
+// Example: isSupportedDocumentLanguage('plaintext') => true, isSupportedDocumentLanguage('python') => true.
 export function isSupportedDocumentLanguage(languageId: string): boolean {
-  return (
-    languageId === 'markdown' ||
-    languageId === 'skill' ||
-    languageId === 'plaintext' ||
-    languageId === 'text' ||
-    languageId === 'log'
-  );
+  return isSupportedCommentLanguage(languageId);
 }
 
 // Invariant: Provides lightbulb quick actions when text is selected in standard text editors.
