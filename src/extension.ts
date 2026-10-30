@@ -727,10 +727,27 @@ export function activate(context: vscode.ExtensionContext) {
 
   handleEditorSelectionOrActiveChange(vscode.window.activeTextEditor);
   const badgeClickDetector = new SelectionBadgeClickDetector();
+  // Invariant: Seed the badge anchor from a selection that existed before any selection event.
+  // Why: Activation or tab switches can show the badge without a prior selection-change event.
+  // Example: text already selected when the extension activates -> first badge click still works.
+  const primeBadgeDetector = (editor?: vscode.TextEditor): void => {
+    if (editor) {
+      badgeClickDetector.handle(editor.document, undefined, editor.selections);
+    }
+  };
+  primeBadgeDetector(vscode.window.activeTextEditor);
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor(handleEditorSelectionOrActiveChange),
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      primeBadgeDetector(editor);
+      handleEditorSelectionOrActiveChange(editor);
+    }),
     vscode.window.onDidChangeTextEditorSelection(e => {
       const clickedRange = badgeClickDetector.handle(e.textEditor.document, e.kind, e.selections);
+      writeDebugLog(
+        `selection kind=${e.kind} sel=${e.selections
+          .map(s => `${s.anchor.line}:${s.anchor.character}->${s.active.line}:${s.active.character}`)
+          .join(',')} badgeClick=${clickedRange ? 'yes' : 'no'}`
+      );
       if (clickedRange && isClickableSelectionBadgeEnabled()) {
         void openCommentFromSelectionBadge(e.textEditor, clickedRange);
         return;
@@ -1686,6 +1703,21 @@ async function promptForTextEditorCommentContent(selectedText: string): Promise<
   return entered && entered.trim() ? entered.trim() : undefined;
 }
 
+// Invariant: Appends a line to $OMNICOMMENT_DEBUG_LOG only when that variable is set.
+// Why: Real mouse interactions cannot be observed from tests; this records what VS Code reports.
+// Example: OMNICOMMENT_DEBUG_LOG=/tmp/oc.log -> "selection kind=2 sel=1:0->1:5 badgeClick=no".
+function writeDebugLog(message: string): void {
+  const logPath = process.env.OMNICOMMENT_DEBUG_LOG;
+  if (!logPath) {
+    return;
+  }
+  try {
+    fs.appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`);
+  } catch {
+    // Debug logging must never break the extension
+  }
+}
+
 // Invariant: Badge clicks are on by default and can be disabled per user.
 // Why: Detection is positional, so a plain click exactly at a selection's end also matches.
 // Example: "omnicomment.clickableSelectionBadge": false -> badge is display-only.
@@ -1702,6 +1734,7 @@ export async function openCommentFromSelectionBadge(
   editor: vscode.TextEditor,
   clickedRange: vscode.Range
 ): Promise<void> {
+  writeDebugLog(`badge click -> addComment ${clickedRange.start.line}:${clickedRange.start.character}`);
   editor.selection = new vscode.Selection(clickedRange.start, clickedRange.end);
   await vscode.commands.executeCommand('omnicomment.addComment', {
     uri: editor.document.uri,

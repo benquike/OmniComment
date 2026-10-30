@@ -625,6 +625,12 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     assert.ok(clicked, 'Mouse click at selection end must be detected as a badge click');
     assert.strictEqual(document.getText(clicked!), 'bravo');
 
+    // Right half of the pill lands one column past the end (measured with real mouse clicks)
+    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
+    assert.ok(detector.handle(document, Kind.Mouse, [sel(1, 6, 1, 6)]), 'end+1 must count as a badge click');
+    detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
+    assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 7, 1, 7)]), undefined, 'end+2 is real text');
+
     // Negative cases: inside the selection, keyboard move, elsewhere
     detector.handle(document, Kind.Mouse, [sel(1, 0, 1, 5)]);
     assert.strictEqual(detector.handle(document, Kind.Mouse, [sel(1, 2, 1, 2)]), undefined);

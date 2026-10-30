@@ -6,10 +6,12 @@ interface BadgeAnchor {
   selection: vscode.Range;
 }
 
-// Invariant: A mouse event that collapses the previous selection to exactly its end is a badge click.
-// Why: The "💬 Comment" badge is an `after` decoration; VS Code gives no click event for it, but
-//      clicking it places the caret at the decoration's anchor (= the previous selection end).
-// Example: select (2,0)-(2,5) -> click badge -> Mouse event, caret (2,5) => badge click.
+// Invariant: A mouse event that collapses the previous selection to its end (or one column past it,
+//            on the same line) is a badge click.
+// Why: The "💬 Comment" badge is an `after` decoration; VS Code gives no click event for it. Measured
+//      with real mouse clicks (CDP): the left half of the pill puts the caret at the selection end,
+//      the right half (over the word "Comment") one column further.
+// Example: select (1,7)-(1,13) -> click pill left => caret (1,13); pill right => caret (1,14).
 export function isSelectionBadgeClick(
   anchor: BadgeAnchor | undefined,
   documentUri: string,
@@ -23,7 +25,12 @@ export function isSelectionBadgeClick(
     return false;
   }
   const caret = selections[0];
-  return caret.isEmpty && caret.active.isEqual(anchor.selection.end);
+  if (!caret.isEmpty) {
+    return false;
+  }
+  const end = anchor.selection.end;
+  const columnsPastEnd = caret.active.character - end.character;
+  return caret.active.line === end.line && (columnsPastEnd === 0 || columnsPastEnd === 1);
 }
 
 // Invariant: Remembers the last commentable selection so a following badge click can recover it.
