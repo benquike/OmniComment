@@ -13,6 +13,8 @@ import { CommentCodeActionProvider } from './providers/CommentCodeActionProvider
 import { SelectionCodeLensProvider } from './providers/SelectionCodeLensProvider';
 import { omniCommentPreviewPlugin } from './markdown/omniCommentPreviewPlugin';
 import { findReplyTarget, formatReplySnippet } from './core/replyThreading';
+import { openCommentStore } from './storage/CommentStore';
+import { CommentStorageMode } from './services/CommentService';
 import {
   CommentBoxConfig,
   CommentBoxWidthMode,
@@ -21,7 +23,8 @@ import {
   isSupportedCommentDocument,
   isSupportedCommentLanguage,
   isSupportedCommentUri,
-  Reply
+  Reply,
+  Comment as OmniComment
 } from './core/types';
 
 let commentService: CommentService;
@@ -116,6 +119,17 @@ function syncMarkdownEditorIntegration(extPath: string): void {
             fs.writeFileSync(officeOutExt, content, 'utf8');
           }
         }
+      }
+      // Invariant: vscode-office relays office.markdown.setOmniComments to its Markdown webviews.
+      // Why: In database mode the webview gets comments from the extension, not from the document.
+      // Example: executeCommand('office.markdown.setOmniComments', { uri, comments }) -> webview event.
+      const configRegistration = 'zS("updateOmniCommentConfig",t||{})})';
+      if (!content.includes('office.markdown.setOmniComments') && content.includes(configRegistration)) {
+        content = content.replace(
+          configRegistration,
+          `${configRegistration};xP.commands.registerCommand("office.markdown.setOmniComments",t=>{zS("setOmniComments",t||{})})`
+        );
+        fs.writeFileSync(officeOutExt, content, 'utf8');
       }
     }
   } catch (err) {
@@ -360,6 +374,13 @@ async function saveDocumentIfCustomEditor(ctx: {
   document: vscode.TextDocument;
   editor?: vscode.TextEditor;
 }): Promise<void> {
+  // Invariant: In database mode comment actions never save the user's document.
+  // Why: The document was not modified by the comment action; saving would also persist
+  //      unrelated unsaved user edits behind their back.
+  // Example: reply added while notes.txt has unsaved edits -> notes.txt stays unsaved.
+  if (commentService.isDatabaseMode()) {
+    return;
+  }
   if (!ctx.document.isUntitled && ctx.document.isDirty) {
     try {
       await ctx.document.save();
@@ -395,7 +416,14 @@ export function activate(context: vscode.ExtensionContext) {
   syncMarkdownEditorIntegration(context.extensionPath);
 
   // Initialize services
-  commentService = new CommentService();
+  // Invariant: Comments live in a per-workspace store in VS Code's private extension storage.
+  // Why: Keeps commented files clean (no dirty state, no git diff); inFile stays available.
+  // Example: ~/.config/Code/User/workspaceStorage/<id>/benquike.omnicomment/omnicomment.db.
+  const storageDir = (context.storageUri ?? vscode.Uri.joinPath(context.globalStorageUri, 'no-workspace')).fsPath;
+  const commentStore = openCommentStore(storageDir);
+  context.subscriptions.push({ dispose: () => commentStore.close() });
+  commentService = new CommentService(commentStore, getCommentStorageMode);
+  registerMarkdownEditorStorageBridge(context);
   commentDecorator = new CommentDecorator(context.extensionUri);
   inlineCommentController = new InlineCommentController();
   context.subscriptions.push(inlineCommentController);
@@ -1227,6 +1255,40 @@ export function activate(context: vscode.ExtensionContext) {
       if (event.affectsConfiguration('omnicomment.commentBox')) {
         await broadcastCommentBoxConfig();
       }
+      // Invariant: Switching storage mode reloads every document's comments from the new source.
+      // Why: Cached comments came from the previous backend (file block vs database).
+      // Example: storage "inFile" -> "database": highlights now come from omnicomment.db.
+      if (event.affectsConfiguration('omnicomment.storage')) {
+        commentService.clearAllCaches();
+        const ctx = await getActiveMarkdownContext();
+        if (ctx) {
+          await refreshForContext(ctx.document, ctx.editor);
+        }
+      }
+    }),
+    // Invariant: Database rows follow files renamed/moved inside VS Code.
+    // Example: Explorer rename notes.txt -> todo.txt keeps its comment threads.
+    vscode.workspace.onDidRenameFiles(event => {
+      for (const { oldUri, newUri } of event.files) {
+        commentService.renameDocumentComments(oldUri, newUri);
+      }
+    }),
+    vscode.commands.registerCommand('omnicomment.exportCommentsToFile', async () => {
+      const ctx = await getActiveMarkdownContext();
+      if (!ctx) {
+        vscode.window.showErrorMessage('OmniComment: open a document to export its comments');
+        return;
+      }
+      if (commentService.getComments(ctx.document).length === 0) {
+        vscode.window.showInformationMessage('OmniComment: this document has no comments to export');
+        return;
+      }
+      const ok = await commentService.exportCommentsToFile(ctx.document);
+      vscode.window.showInformationMessage(
+        ok
+          ? 'OmniComment: comments written into the file as a <!-- omnicomment --> block (unsaved).'
+          : 'OmniComment: export failed'
+      );
     })
   );
 
@@ -1707,6 +1769,14 @@ async function promptForTextEditorCommentContent(selectedText: string): Promise<
   return entered && entered.trim() ? entered.trim() : undefined;
 }
 
+// Invariant: Reads omnicomment.storage; anything other than "inFile" means the database.
+// Why: Database is the default so files stay clean; inFile keeps the legacy behaviour.
+// Example: unset => 'database'; "inFile" => 'inFile'.
+export function getCommentStorageMode(): CommentStorageMode {
+  const value = vscode.workspace.getConfiguration('omnicomment').get<string>('storage', 'database');
+  return value === 'inFile' ? 'inFile' : 'database';
+}
+
 // Invariant: Appends a line to $OMNICOMMENT_DEBUG_LOG only when that variable is set.
 // Why: Real mouse interactions cannot be observed from tests; this records what VS Code reports.
 // Example: OMNICOMMENT_DEBUG_LOG=/tmp/oc.log -> "selection kind=2 sel=1:0->1:5".
@@ -1979,6 +2049,74 @@ async function editCommentCommand(commentId?: string) {
 
 async function refreshAll(editor: vscode.TextEditor) {
   await refreshForContext(editor.document, editor);
+}
+
+// Invariant: Pushes a document's comments (and the storage mode) to Markdown Editor webviews.
+// Why: In database mode the webview cannot read comments from the markdown text any more.
+// Example: { uri: 'file:///w/a.md', storageMode: 'database', comments: [...], author: 'Hui' }.
+async function pushCommentsToMarkdownEditor(
+  document: vscode.TextDocument,
+  webviewId?: string
+): Promise<void> {
+  const payload = {
+    webviewId,
+    uri: document.uri.toString(),
+    storageMode: getCommentStorageMode(),
+    comments: commentService.getComments(document),
+    author: await commentService.getGitUserName(document)
+  };
+  await vscode.commands
+    .executeCommand('office.markdown.setOmniComments', payload)
+    .then(undefined, () => undefined);
+}
+
+// Invariant: Two commands let the Markdown Editor webview load and save comments via the extension.
+// Why: Database mode keeps comments out of the document; the webview is the only UI that used to
+//      write the comment block into the markdown itself.
+// Example: webview -> omnicomment.webviewHello({ webviewId }) -> setOmniComments(...) -> webview.
+function registerMarkdownEditorStorageBridge(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'omnicomment.webviewHello',
+      async (payload?: { webviewId?: string; uri?: string }) => {
+        // Prefer the URI the webview reports for itself; the active tab may not be it yet.
+        const document = payload?.uri
+          ? await vscode.workspace.openTextDocument(vscode.Uri.parse(payload.uri)).then(
+              d => d,
+              () => undefined
+            )
+          : (await getActiveMarkdownContext())?.document;
+        if (document) {
+          await pushCommentsToMarkdownEditor(document, payload?.webviewId);
+        }
+      }
+    ),
+    vscode.commands.registerCommand(
+      'omnicomment.webviewSaveComments',
+      async (payload?: { uri?: string; comments?: OmniComment[] }) => {
+        if (!payload?.uri || !Array.isArray(payload.comments) || !commentService.isDatabaseMode()) {
+          return false;
+        }
+        const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(payload.uri));
+        const ok = await commentService.saveComments(document, payload.comments);
+        const editor = vscode.window.visibleTextEditors.find(
+          e => e.document.uri.toString() === document.uri.toString()
+        );
+        await refreshForContext(document, editor);
+        return ok;
+      }
+    ),
+    // Comments changed from any other UI (sidebar, text editor, agent API) -> refresh the webview.
+    commentService.onDidChangeComments(async uri => {
+      if (!commentService.isDatabaseMode()) {
+        return;
+      }
+      const document = vscode.workspace.textDocuments.find(d => d.uri.toString() === uri.toString());
+      if (document) {
+        await pushCommentsToMarkdownEditor(document);
+      }
+    })
+  );
 }
 
 async function refreshForContext(

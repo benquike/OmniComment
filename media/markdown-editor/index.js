@@ -219,7 +219,12 @@ handler.on("open", async (md) => {
     },
     after() {
       bindLinkErrors(handler, editor);
-      omniAnnotations = initOmniAnnotations(getMarkdownValue);
+      // documentCacheId is `${scheme}:${uri}`; strip the scheme prefix to get this view's document URI.
+      const documentUri =
+        typeof documentCacheId === 'string' && documentCacheId.includes(':')
+          ? documentCacheId.slice(documentCacheId.indexOf(':') + 1)
+          : '';
+      omniAnnotations = initOmniAnnotations(getMarkdownValue, { documentUri });
       setTimeout(() => omniAnnotations.refreshHighlights(content), 80);
       const { viewerSettings } = md;
       observeWorkspaceAbsoluteImages(document.getElementById('vditor'), workspaceBaseUrl);
@@ -316,6 +321,11 @@ handler.on("open", async (md) => {
       // Invariant: Listens for external comment box configuration updates from the extension host.
       // Why: Propagates user setting modifications (density presets, font size, markdown toggles) to the webview.
       // Example: handler.on('updateOmniCommentConfig', { widthMode: 'compact' }) updates active card layout.
+      // Invariant: Database storage mode delivers comments from the extension, not the markdown.
+      // Example: handler.on('setOmniComments', { webviewId, uri, storageMode: 'database', comments }).
+      handler.on("setOmniComments", (payload) => {
+        omniAnnotations?.setExternalComments?.(payload);
+      });
       handler.on("updateOmniCommentConfig", (cfg) => {
         omniAnnotations?.applyConfig?.(cfg);
       });

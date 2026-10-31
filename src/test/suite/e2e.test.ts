@@ -269,77 +269,90 @@ suite('End-to-End (E2E) Commenting Test Suite', () => {
       assert.ok(afterWebviewCommentClick);
       assert.strictEqual(afterWebviewCommentClick!.threadCount, 2);
 
+      // Database storage: the webview's own Comment button saves through the extension store
       await waitForCondition(() => {
-        const diskContent = fs.readFileSync(filePath, 'utf-8');
-        return diskContent.includes(secondCommentText);
+        commentService.clearCache(ctx!.document);
+        return commentService.getComments(ctx!.document).some(c => c.content === secondCommentText);
       }, 8000);
     }
 
-    // Verify the file on disk was saved with both the comment and response
-    await waitForCondition(() => {
-      const diskContent = fs.readFileSync(filePath, 'utf-8');
-      return (
-        diskContent.includes('<!-- omnicomment') &&
-        diskContent.includes(customCommentText) &&
-        diskContent.includes(replyText)
-      );
-    });
+    // Database storage (default): comments persist in the store and the .md file is never modified
+    commentService.clearCache(ctx!.document);
+    const stored = commentService.getComments(ctx!.document);
+    assert.ok(stored.some(c => c.content === customCommentText), 'comment persisted in the store');
+    assert.ok(
+      stored.some(c => (c.replies || []).some(r => r.content === replyText)),
+      'reply persisted in the store'
+    );
+    const diskContent = fs.readFileSync(filePath, 'utf-8');
+    assert.ok(!diskContent.includes('<!-- omnicomment'), 'no comment block written into the .md file');
+    assert.ok(!diskContent.includes(customCommentText), 'comment text not written into the .md file');
+    assert.strictEqual(ctx!.document.isDirty, false, 'Markdown Editor document is not dirtied by comments');
   });
 
   test('E2E: Should parse and display legacy <!-- markco-comments in Markdown Editor', async () => {
-    const filePath = path.join(tempDir, 'e2e-legacy-markco.md');
-    const legacyCommentId = 'legacy-comm-1';
-    const legacyCommentText = 'Legacy comment created under markco';
-    const initialContent = [
-      '# Legacy Document',
-      '',
-      'This is a legacy document with existing annotations.',
-      '',
-      '<!-- markco-comments',
-      JSON.stringify(
-        {
-          version: 1,
-          comments: [
-            {
-              id: legacyCommentId,
-              anchor: {
-                text: 'existing annotations',
-                startLine: 2,
-                startChar: 27,
-                endLine: 2,
-                endChar: 47
-              },
-              content: legacyCommentText,
-              author: 'Legacy User',
-              createdAt: '2026-10-25T10:00:00.000Z'
-            }
-          ]
-        },
-        null,
-        2
-      ),
-      '-->'
-    ].join('\n');
+    // Legacy in-file blocks are only read in inFile storage mode (database mode ignores them).
+    const omniCfg = vscode.workspace.getConfiguration('omnicomment');
+    await omniCfg.update('storage', 'inFile', vscode.ConfigurationTarget.Global);
+    getCommentServiceForTesting().clearAllCaches();
+    try {
+      const filePath = path.join(tempDir, 'e2e-legacy-markco.md');
+      const legacyCommentId = 'legacy-comm-1';
+      const legacyCommentText = 'Legacy comment created under markco';
+      const initialContent = [
+        '# Legacy Document',
+        '',
+        'This is a legacy document with existing annotations.',
+        '',
+        '<!-- markco-comments',
+        JSON.stringify(
+          {
+            version: 1,
+            comments: [
+              {
+                id: legacyCommentId,
+                anchor: {
+                  text: 'existing annotations',
+                  startLine: 2,
+                  startChar: 27,
+                  endLine: 2,
+                  endChar: 47
+                },
+                content: legacyCommentText,
+                author: 'Legacy User',
+                createdAt: '2026-10-25T10:00:00.000Z'
+              }
+            ]
+          },
+          null,
+          2
+        ),
+        '-->'
+      ].join('\n');
 
-    fs.writeFileSync(filePath, initialContent, 'utf-8');
-    const fileUri = vscode.Uri.file(filePath);
+      fs.writeFileSync(filePath, initialContent, 'utf-8');
+      const fileUri = vscode.Uri.file(filePath);
 
-    const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
-    if (officeExt) {
-      await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
-      await waitForCondition(async () => {
+      const officeExt = vscode.extensions.getExtension('cweijan.vscode-office');
+      if (officeExt) {
+        await vscode.commands.executeCommand('vscode.openWith', fileUri, 'cweijan.markdownViewer');
+        await waitForCondition(async () => {
+          const state = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
+          return Boolean(
+            state &&
+              state.threadCount === 1 &&
+              state.threads[0].text.includes(legacyCommentText)
+          );
+        }, 8000);
+
         const state = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
-        return Boolean(
-          state &&
-            state.threadCount === 1 &&
-            state.threads[0].text.includes(legacyCommentText)
-        );
-      }, 8000);
-
-      const state = await queryMarkdownEditorInlineStateForTesting(undefined, 800);
-      assert.ok(state);
-      assert.strictEqual(state!.threadCount, 1);
-      assert.strictEqual(state!.threads[0].commentId, legacyCommentId);
+        assert.ok(state);
+        assert.strictEqual(state!.threadCount, 1);
+        assert.strictEqual(state!.threads[0].commentId, legacyCommentId);
+      }
+    } finally {
+      await omniCfg.update('storage', undefined, vscode.ConfigurationTarget.Global);
+      getCommentServiceForTesting().clearAllCaches();
     }
   });
 });

@@ -2,7 +2,7 @@
   "name": "omnicomment",
   "displayName": "OmniComment - Universal Comments & Annotations",
   "description": "Universal commenting and inline annotation system for editors, web, and AI agents",
-  "version": "0.1.24",
+  "version": "0.2.0",
   "license": "MIT",
   "publisher": "benquike",
   "repository": {
@@ -178,6 +178,11 @@
       {
         "command": "omnicomment.agent.deleteComment",
         "title": "Agent: Delete Comment",
+        "category": "OmniComment"
+      },
+      {
+        "command": "omnicomment.exportCommentsToFile",
+        "title": "Export Comments into File (for sharing)",
         "category": "OmniComment"
       },
       {
@@ -361,6 +366,19 @@
           "type": "string",
           "default": "",
           "description": "Default author name for new comments and replies (falls back to git user name or OS username)"
+        },
+        "omnicomment.storage": {
+          "type": "string",
+          "enum": [
+            "database",
+            "inFile"
+          ],
+          "enumDescriptions": [
+            "Store comments in an extension-managed SQLite database per workspace (files are never modified)",
+            "Store comments inside each file as a <!-- omnicomment --> block (shareable via git; modifies the file)"
+          ],
+          "default": "database",
+          "description": "Where OmniComment stores comments"
         },
         "omnicomment.selectionCodeLens": {
           "type": "boolean",

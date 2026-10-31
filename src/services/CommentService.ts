@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { Comment, CommentAnchor, Reply } from '../core/types';
 import { findReplyTarget } from '../core/replyThreading';
+import type { ICommentStore } from '../storage/CommentStore';
 import { AnchorEngine } from '../core/AnchorEngine';
 import { MarkdownStorageAdapter, OMNI_COMMENT_MARKER } from '../storage/MarkdownStorageAdapter';
 import { exec } from 'child_process';
@@ -13,9 +14,33 @@ const execAsync = promisify(exec);
  * OmniComment Core Comment Service
  * Manages comment parsing, anchoring, thread lifecycles, and document storage.
  */
+export type CommentStorageMode = 'database' | 'inFile';
+
 export class CommentService {
   private commentCache: Map<string, Comment[]> = new Map();
   private storageAdapter = new MarkdownStorageAdapter();
+  private readonly changeEmitter = new vscode.EventEmitter<vscode.Uri>();
+  /** Fires after comments of a document are saved (any storage mode). */
+  public readonly onDidChangeComments = this.changeEmitter.event;
+
+  // Invariant: Without a store the service keeps the legacy in-file behaviour.
+  // Why: Unit tests and the inFile setting rely on comments living in the document itself.
+  // Example: new CommentService() -> inFile; new CommentService(store, () => 'database') -> SQLite.
+  constructor(
+    private readonly store?: ICommentStore,
+    private readonly getStorageMode: () => CommentStorageMode = () => 'inFile'
+  ) {}
+
+  // Invariant: Database mode needs both a store and the setting; otherwise comments live in-file.
+  // Why: Lets users opt back into in-file storage (omnicomment.storage = "inFile").
+  // Example: store present + storage "database" => true.
+  public isDatabaseMode(): boolean {
+    return Boolean(this.store) && this.getStorageMode() === 'database';
+  }
+
+  public getStoreDescription(): string {
+    return this.store ? `${this.store.kind}: ${this.store.location}` : 'none';
+  }
 
   /**
    * Get the Git username from git config, with fallback to 'user'
@@ -45,8 +70,9 @@ export class CommentService {
    */
   parseComments(document: vscode.TextDocument): Comment[] {
     const uri = document.uri.toString();
-    const text = document.getText();
-    const comments = this.storageAdapter.parseCommentsFromText(text);
+    const comments = this.isDatabaseMode()
+      ? this.store!.load(uri)
+      : this.storageAdapter.parseCommentsFromText(document.getText());
     this.commentCache.set(uri, comments);
     return comments;
   }
@@ -63,9 +89,38 @@ export class CommentService {
   }
 
   /**
-   * Save comments to a document
+   * Save comments for a document: to the extension store (database mode) or into the file.
    */
   async saveComments(document: vscode.TextDocument, comments: Comment[]): Promise<boolean> {
+    if (!this.isDatabaseMode()) {
+      return this.saveCommentsInFile(document, comments);
+    }
+    // Invariant: Database mode never edits the document, so it never becomes dirty.
+    // Why: Comments in the file made every comment action modify (and save) the user's file.
+    // Example: add a reply in notes.txt -> row updated in omnicomment.db, notes.txt untouched.
+    try {
+      this.store!.save(document.uri.toString(), comments);
+    } catch (err) {
+      vscode.window.showErrorMessage(`OmniComment: failed to save comments (${String(err)})`);
+      return false;
+    }
+    this.commentCache.set(document.uri.toString(), [...comments]);
+    this.changeEmitter.fire(document.uri);
+    return true;
+  }
+
+  // Invariant: Writes the comments as a <!-- omnicomment --> block inside the document.
+  // Why: Legacy/inFile storage and the "Export Comments to File" command for sharing.
+  // Example: exportCommentsToFile(doc) appends the block and leaves the store unchanged.
+  async exportCommentsToFile(document: vscode.TextDocument): Promise<boolean> {
+    return this.saveCommentsInFile(document, this.getComments(document), false);
+  }
+
+  private async saveCommentsInFile(
+    document: vscode.TextDocument,
+    comments: Comment[],
+    updateCache = true
+  ): Promise<boolean> {
     const uri = document.uri.toString();
     const text = document.getText();
 
@@ -110,10 +165,23 @@ export class CommentService {
     }
 
     const success = await vscode.workspace.applyEdit(edit);
-    if (success) {
+    if (success && updateCache) {
       this.commentCache.set(uri, [...comments]);
+      this.changeEmitter.fire(document.uri);
     }
     return success;
+  }
+
+  // Invariant: Moves stored comments when a file is renamed or moved inside VS Code.
+  // Why: Database rows are keyed by URI; without this a rename would orphan the comments.
+  // Example: rename notes.txt -> todo.txt keeps its threads.
+  renameDocumentComments(oldUri: vscode.Uri, newUri: vscode.Uri): void {
+    if (!this.isDatabaseMode()) {
+      return;
+    }
+    this.store!.rename(oldUri.toString(), newUri.toString());
+    this.commentCache.delete(oldUri.toString());
+    this.commentCache.delete(newUri.toString());
   }
 
   /**
@@ -579,5 +647,9 @@ export class CommentService {
    */
   clearCache(document: vscode.TextDocument): void {
     this.commentCache.delete(document.uri.toString());
+  }
+
+  clearAllCaches(): void {
+    this.commentCache.clear();
   }
 }

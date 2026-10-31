@@ -118,10 +118,16 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     assert.strictEqual(comments[0].anchor.text, targetPhrase);
     assert.strictEqual(comments[0].content, commentBody);
 
-    // Verify comment block format in the actual text document
+    // Database storage (default): the .txt file itself is never modified or dirtied
     const rawFileContent = document.getText();
-    assert.ok(rawFileContent.includes('<!-- omnicomment'), 'Comment block must be stored in .txt file');
-    assert.ok(rawFileContent.includes('quantified SLA targets'), 'Comment content must be serialized');
+    assert.ok(!rawFileContent.includes('<!-- omnicomment'), 'Comments must not be written into the .txt file');
+    assert.strictEqual(document.isDirty, false, 'Adding a comment must not make the file dirty');
+    commentService.clearCache(document);
+    assert.strictEqual(
+      commentService.getComments(document)[0]?.content,
+      commentBody,
+      'Comment must persist in the extension store'
+    );
   });
 
   // Topology: Active comment on .txt -> omnicomment.editorCommentAction(reply) -> omnicomment.editorCommentAction(resolve)
@@ -330,10 +336,13 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
 
     assert.strictEqual(commentService.getComments(document)[0].resolved, true);
 
-    // Verify file content contains comment block
+    // Database storage (default): the .log file stays clean while comments persist in the store
     const rawLog = document.getText();
-    assert.ok(rawLog.includes('<!-- omnicomment'), 'Comment block must be stored in xxx.log');
-    assert.ok(rawLog.includes('connection pool exhausted'), 'Anchor must be present');
+    assert.ok(!rawLog.includes('<!-- omnicomment'), 'Comments must not be written into xxx.log');
+    assert.strictEqual(document.isDirty, false, 'Comment actions must not make xxx.log dirty');
+    assert.ok(rawLog.includes('connection pool exhausted'), 'Anchor text must still be present');
+    commentService.clearCache(document);
+    assert.strictEqual(commentService.getComments(document)[0]?.resolved, true, 'Resolved state persisted');
   });
 
   // Topology: Text selection in .txt editor -> updateSelectionDecoration -> line gutter active
@@ -702,5 +711,61 @@ suite('Plain Text (.txt) Mode End-to-End Test Suite', () => {
     for (const marker of ['data-reply-to=', 'clear-reply-target', 'omni-inline-reply-quote', 'inReplyTo']) {
       assert.ok(annotations.includes(marker), `omniAnnotations.js must contain ${marker}`);
     }
+  });
+
+  // Topology: storage=database -> comment on file with unsaved edits -> rename -> export -> storage=inFile
+  // Expected: file never edited/saved by comment actions; rows follow renames; export/inFile still work.
+  test('Txt 16: Database storage keeps files clean, follows renames, and supports export / inFile', async () => {
+    const service = getCommentServiceForTesting();
+    assert.ok(service.isDatabaseMode(), 'database storage is the default');
+    assert.ok(/^sqlite: .*omnicomment\.db$/.test(service.getStoreDescription()), service.getStoreDescription());
+
+    const filePath = path.join(tempDir, 'db-mode.txt');
+    fs.writeFileSync(filePath, 'alpha\nkeep this file clean\nomega\n', 'utf-8');
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+    const editor = await vscode.window.showTextDocument(document);
+
+    // User has unsaved edits; comment actions must neither modify nor save the file
+    await editor.edit(b => b.insert(new vscode.Position(0, 0), 'UNSAVED '));
+    assert.ok(document.isDirty);
+    editor.selection = new vscode.Selection(new vscode.Position(1, 0), new vscode.Position(1, 4));
+    await vscode.commands.executeCommand('omnicomment.addComment', { content: 'DB comment' });
+    const added = service.getComments(document).find(c => c.content === 'DB comment')!;
+    assert.ok(added, 'comment added');
+    await service.addReply(document, added.id, 'DB reply');
+    assert.ok(document.isDirty, 'unsaved user edits stay unsaved');
+    assert.ok(!fs.readFileSync(filePath, 'utf-8').includes('UNSAVED'), 'file on disk was not saved behind the user');
+    assert.ok(!document.getText().includes('<!-- omnicomment'), 'no comment block in the document');
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+
+    // Rename inside VS Code moves the stored comments
+    const renamedUri = vscode.Uri.file(path.join(tempDir, 'db-mode-renamed.txt'));
+    const rename = new vscode.WorkspaceEdit();
+    rename.renameFile(document.uri, renamedUri);
+    assert.ok(await vscode.workspace.applyEdit(rename));
+    const renamedDoc = await vscode.workspace.openTextDocument(renamedUri);
+    const moved = service.getComments(renamedDoc).find(c => c.id === added.id);
+    assert.ok(moved, 'comments follow the renamed file');
+    assert.strictEqual(moved!.replies?.[0]?.content, 'DB reply');
+
+    // Export writes a shareable block into the file (explicit user action)
+    await vscode.window.showTextDocument(renamedDoc);
+    await vscode.commands.executeCommand('omnicomment.exportCommentsToFile');
+    assert.ok(renamedDoc.getText().includes('<!-- omnicomment'), 'export writes the block into the file');
+    assert.ok(renamedDoc.getText().includes('DB comment'));
+    await vscode.commands.executeCommand('workbench.action.files.revert');
+
+    // inFile mode still works and reads from the document
+    const cfg = vscode.workspace.getConfiguration('omnicomment');
+    await cfg.update('storage', 'inFile', vscode.ConfigurationTarget.Global);
+    try {
+      assert.ok(!service.isDatabaseMode());
+      service.clearAllCaches();
+      assert.strictEqual(service.getComments(renamedDoc).length, 0, 'inFile mode reads the (clean) file');
+    } finally {
+      await cfg.update('storage', undefined, vscode.ConfigurationTarget.Global);
+    }
+    service.clearAllCaches();
+    assert.ok(service.getComments(renamedDoc).some(c => c.id === added.id), 'back in database mode');
   });
 });

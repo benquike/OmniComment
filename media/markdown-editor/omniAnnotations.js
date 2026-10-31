@@ -654,12 +654,56 @@ function formatRelativeTime(iso) {
   }
 }
 
-export function initOmniAnnotations(getMarkdownValue) {
+export function initOmniAnnotations(getMarkdownValue, options = {}) {
   let activeComments = [];
   let commentRanges = []; // Array of { comment, range, blockEl }
   let focusedCommentId = null;
   let latestSerializedBlock = '';
   let cachedAuthor = 'Hui Peng';
+  // Database storage mode: comments come from / go to the extension, never the markdown text.
+  // null = legacy in-file mode (comments parsed from the <!-- omnicomment --> block).
+  let externalStore = null; // { uri: string, comments: Comment[] }
+  const webviewId = generateId();
+  // URI of the document shown in this webview (from vscode-office's documentCacheId); '' if unknown.
+  const documentUri = typeof options.documentUri === 'string' ? options.documentUri : '';
+
+  // Invariant: Comments for the current view come from the extension store when present.
+  // Why: In database mode the markdown has no (authoritative) comment block.
+  // Example: externalStore set -> deep copy of its comments; otherwise parse the markdown.
+  function loadCommentsFor(markdown) {
+    if (externalStore) {
+      return JSON.parse(JSON.stringify(externalStore.comments || []));
+    }
+    return parseOmniComments(markdown);
+  }
+
+  // Invariant: Applies a storage payload from the extension addressed to this webview.
+  // Why: vscode-office broadcasts to every Markdown webview; each keeps only its own document.
+  // Example: { webviewId: <mine>, uri: 'file:///a.md', storageMode: 'database', comments: [...] }.
+  function setExternalComments(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    const myUri = externalStore?.uri || documentUri;
+    const addressedToMe =
+      (payload.webviewId && payload.webviewId === webviewId) ||
+      (!payload.webviewId && Boolean(myUri) && payload.uri === myUri);
+    if (!addressedToMe) return;
+    if (payload.storageMode !== 'database') {
+      externalStore = null;
+    } else {
+      externalStore = { uri: payload.uri, comments: Array.isArray(payload.comments) ? payload.comments : [] };
+      latestSerializedBlock = '';
+    }
+    if (payload.author) {
+      cachedAuthor = payload.author;
+    }
+    refreshHighlights();
+  }
+
+  // Ask the extension which storage mode applies and for this document's comments.
+  if (window.vscodeEvent) {
+    // vscode-office relays emit('command', [id, ...args]) as executeCommand(id, ...args).
+    window.vscodeEvent.emit('command', ['omnicomment.webviewHello', { webviewId, uri: documentUri }]);
+  }
 
   // Collapse state inside the Markdown view
   const collapsedComments = new Set(); // commentIds whose inline box is collapsed to a 1-line header bar
@@ -746,12 +790,12 @@ export function initOmniAnnotations(getMarkdownValue) {
   // Hook into imagePath.js restoreWorkspaceBaseUrls so Vditor's getValue() and input() always preserve the latest comments block
   window.__omniSyncMarkdownBlock = function (md) {
         if (typeof md !== 'string') return md;
-    if (!latestSerializedBlock) return md;
+    if (externalStore || !latestSerializedBlock) return md;
     return replaceOrAppendCommentsBlock(md, latestSerializedBlock);
   };
 
   function syncFromExternalUpdate(markdownContent) {
-    if (typeof markdownContent !== 'string') return;
+    if (typeof markdownContent !== 'string' || externalStore) return;
     const span = findCommentBlockSpan(markdownContent);
     latestSerializedBlock = span ? span.blockText : '';
     const parsed = parseOmniComments(markdownContent);
@@ -764,7 +808,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     if (!actionPayload || !actionPayload.type) return;
 
     const currentMd = getMarkdownValue?.() || '';
-    const comments = parseOmniComments(currentMd);
+    const comments = loadCommentsFor(currentMd);
     if (comments.length > 0 && comments[0].author) {
       cachedAuthor = comments[0].author;
     }
@@ -864,6 +908,21 @@ export function initOmniAnnotations(getMarkdownValue) {
       }
       default:
         return;
+    }
+
+    // Invariant: Database mode saves through the extension and leaves the markdown untouched.
+    // Why: Writing the block (and doSave) is exactly what made files dirty.
+    // Example: add reply -> omnicomment.webviewSaveComments({ uri, comments }); no doSave.
+    if (externalStore) {
+      externalStore.comments = comments;
+      refreshHighlights(currentMd);
+      if (window.vscodeEvent) {
+        window.vscodeEvent.emit('command', [
+          'omnicomment.webviewSaveComments',
+          { uri: externalStore.uri, comments }
+        ]);
+      }
+      return;
     }
 
     latestSerializedBlock = serializeCommentsBlock(comments);
@@ -1882,7 +1941,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         }
         applyConfig({ [prop]: val });
         if (window.vscodeEvent) {
-          window.vscodeEvent.emit('command', 'omnicomment.saveCommentBoxConfig', { [prop]: val });
+          window.vscodeEvent.emit('command', ['omnicomment.saveCommentBoxConfig', { [prop]: val }]);
         }
       });
     });
@@ -1897,7 +1956,7 @@ export function initOmniAnnotations(getMarkdownValue) {
         const val = chk.checked;
         applyConfig({ [prop]: val });
         if (window.vscodeEvent) {
-          window.vscodeEvent.emit('command', 'omnicomment.saveCommentBoxConfig', { [prop]: val });
+          window.vscodeEvent.emit('command', ['omnicomment.saveCommentBoxConfig', { [prop]: val }]);
         }
       });
     });
@@ -2071,7 +2130,7 @@ export function initOmniAnnotations(getMarkdownValue) {
 
     hideStorageBlocks(root);
 
-    if (typeof markdownContent === 'string') {
+    if (typeof markdownContent === 'string' && !externalStore) {
       const span = findCommentBlockSpan(markdownContent);
       if (span) {
         latestSerializedBlock = span.blockText;
@@ -2082,7 +2141,7 @@ export function initOmniAnnotations(getMarkdownValue) {
       typeof markdownContent === 'string'
         ? markdownContent
         : getMarkdownValue?.() || '';
-    activeComments = parseOmniComments(md);
+    activeComments = loadCommentsFor(md);
     if (activeComments.length > 0 && activeComments[0].author) {
       cachedAuthor = activeComments[0].author;
     }
@@ -2606,6 +2665,7 @@ export function initOmniAnnotations(getMarkdownValue) {
     focusCommentById,
     openAddCommentComposer,
     syncFromExternalUpdate,
+    setExternalComments,
     getInlineState,
     applyConfig,
     getConfig: () => ({ ...commentBoxConfig })
